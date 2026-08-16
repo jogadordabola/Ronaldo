@@ -314,10 +314,16 @@ public partial class MainWindow
         TeamOneList.ItemsSource = game.TeamOne.Select(p => new LivePlayerViewModel(_lcu, p)).ToList();
         TeamTwoList.ItemsSource = game.TeamTwo.Select(p => new LivePlayerViewModel(_lcu, p)).ToList();
 
-        bool anyRank = game.TeamOne.Concat(game.TeamTwo).Any(p => p.RankText.Length > 0);
-        InGameNote.Text = anyRank
-            ? ""
-            : "The League client only reports ranked stats for some players, so ranks may be blank.";
+        var everyone = game.TeamOne.Concat(game.TeamTwo).ToList();
+        var notes = new List<string>();
+
+        if (everyone.Count > 0 && !everyone.Any(p => p.RankText.Length > 0))
+            notes.Add("The client only reports ranked stats for some players, so ranks may be blank.");
+
+        if (everyone.Any(p => p.ChampionId > 0) && !everyone.Any(p => p.MasteryText.Length > 0))
+            notes.Add($"No champion mastery came back; the endpoints tried are listed in {MasteryService.DiagnosticPath}");
+
+        InGameNote.Text = string.Join("  ", notes);
 
         if (!game.HasPlayers)
         {

@@ -223,6 +223,26 @@ public class LcuService
         }
     }
 
+    /// <summary>
+    /// Like <see cref="GetAsync"/> but keeps the status code, so callers probing for an
+    /// endpoint that moved between patches can tell "wrong URL" from "no data".
+    /// </summary>
+    public async Task<(int Status, string? Body)> GetWithStatusAsync(string endpoint)
+    {
+        if (_httpClient == null) return (0, null);
+        try
+        {
+            var response = await _httpClient.GetAsync(endpoint);
+            string body = await response.Content.ReadAsStringAsync();
+            return ((int)response.StatusCode, body);
+        }
+        catch
+        {
+            _httpClient = null;
+            return (0, null);
+        }
+    }
+
     public async Task<bool> PutAsync(string endpoint, string jsonBody)
     {
         if (_httpClient == null) return false;

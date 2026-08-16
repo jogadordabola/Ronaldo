@@ -16,11 +16,15 @@ public class LivePlayer
     public int Spell2Id { get; set; }
     public string Position { get; set; } = "";
     public string Puuid { get; set; } = "";
+    public long SummonerId { get; set; }
     public bool IsLocalPlayer { get; set; }
 
     /// <summary>Ranked tier, when the client will tell us. Blank when unavailable.</summary>
     public string RankText { get; set; } = "";
     public string WinRateText { get; set; } = "";
+
+    /// <summary>Mastery on the champion being played, e.g. "M7 · 245K". Blank if unavailable.</summary>
+    public string MasteryText { get; set; } = "";
 }
 
 public class LiveGame
@@ -44,8 +48,13 @@ public class LiveGame
 public class GameSessionService
 {
     private readonly LcuService _lcu;
+    private readonly MasteryService _mastery;
 
-    public GameSessionService(LcuService lcu) => _lcu = lcu;
+    public GameSessionService(LcuService lcu)
+    {
+        _lcu = lcu;
+        _mastery = new MasteryService(lcu);
+    }
 
     /// <summary>Where the raw session is dumped when parsing finds no players.</summary>
     public static string DiagnosticPath => Path.Combine(
@@ -73,6 +82,7 @@ public class GameSessionService
 
         await FillNamesAsync(game);
         await FillRanksAsync(game);
+        await _mastery.FillAsync(game.TeamOne.Concat(game.TeamTwo));
 
         return game;
     }
@@ -128,6 +138,7 @@ public class GameSessionService
             {
                 Name = Str(e, "summonerName", "gameName", "displayName", "summonerInternalName"),
                 Puuid = Str(e, "puuid"),
+                SummonerId = Long(e, "summonerId"),
                 ChampionId = Int(e, "championId", "championPickIntent"),
                 Spell1Id = Int(e, "spell1Id"),
                 Spell2Id = Int(e, "spell2Id"),
@@ -227,6 +238,17 @@ public class GameSessionService
             }
         }
         return "";
+    }
+
+    private static long Long(JsonElement e, params string[] names)
+    {
+        foreach (var n in names)
+        {
+            if (!e.TryGetProperty(n, out var v)) continue;
+            if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out long i) && i > 0) return i;
+            if (v.ValueKind == JsonValueKind.String && long.TryParse(v.GetString(), out long p) && p > 0) return p;
+        }
+        return 0;
     }
 
     private static int Int(JsonElement e, params string[] names)

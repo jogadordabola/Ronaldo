@@ -105,9 +105,14 @@
                         <ui:TextBlock Text="{Binding Name}" FontTypography="BodyStrong"
                                       Foreground="{StaticResource TextHi}"
                                       TextTrimming="CharacterEllipsis"/>
-                        <ui:TextBlock Text="{Binding ChampionName}" Style="{StaticResource Caption}"
-                                      Foreground="{StaticResource Lilac}"
-                                      TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal">
+                            <ui:TextBlock Text="{Binding ChampionName}" Style="{StaticResource Caption}"
+                                          Foreground="{StaticResource Lilac}"
+                                          TextTrimming="CharacterEllipsis"/>
+                            <ui:TextBlock Text="{Binding MasteryText}" Style="{StaticResource Caption}"
+                                          Foreground="{StaticResource Amber}" Margin="6,0,0,0"
+                                          Visibility="{Binding HasMastery, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
 
                         <ui:TextBlock Text="{Binding RankText}" Style="{StaticResource Caption}"
                                       Foreground="{StaticResource Mint}"

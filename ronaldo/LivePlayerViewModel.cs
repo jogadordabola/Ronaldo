@@ -28,6 +28,7 @@ public class LivePlayerViewModel
 
         RankText = player.RankText;
         WinRateText = player.WinRateText;
+        MasteryText = player.MasteryText;
         PositionText = player.Position.ToUpperInvariant();
     }
 
@@ -49,9 +50,11 @@ public class LivePlayerViewModel
     public List<IconItem> Spells { get; }
     public string RankText { get; }
     public string WinRateText { get; }
+    public string MasteryText { get; }
     public string PositionText { get; }
     public bool IsLocalPlayer { get; }
 
     public bool HasRank => RankText.Length > 0;
     public bool HasWinRate => WinRateText.Length > 0;
+    public bool HasMastery => MasteryText.Length > 0;
 }
