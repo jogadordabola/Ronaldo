@@ -12,6 +12,10 @@ public class SummonerProfile
     public int Level { get; set; }
     public int ProfileIconId { get; set; }
     public string Puuid { get; set; } = "";
+    public long AccountId { get; set; }
+
+    /// <summary>False when this is another player, whose data the client may withhold.</summary>
+    public bool IsSelf { get; set; }
 }
 
 public class RankEntry
@@ -93,9 +97,16 @@ public class ProfileService
         { 1900, "URF" }, { 2000, "Tutorial" }
     };
 
-    public async Task<SummonerProfile?> GetSummonerAsync()
+    public Task<SummonerProfile?> GetSummonerAsync() =>
+        ReadSummonerAsync("lol-summoner/v1/current-summoner", isSelf: true);
+
+    /// <summary>Looks up another player. Returns null if the client won't resolve them.</summary>
+    public Task<SummonerProfile?> GetSummonerByPuuidAsync(string puuid) =>
+        ReadSummonerAsync($"lol-summoner/v2/summoners/puuid/{puuid}", isSelf: false);
+
+    private async Task<SummonerProfile?> ReadSummonerAsync(string endpoint, bool isSelf)
     {
-        string? json = await _lcu.GetAsync("lol-summoner/v1/current-summoner");
+        string? json = await _lcu.GetAsync(endpoint);
         if (string.IsNullOrEmpty(json)) return null;
 
         try
@@ -111,7 +122,9 @@ public class ProfileService
                 Name = tag.Length > 0 ? $"{name}#{tag}" : name,
                 Level = Int(r, "summonerLevel"),
                 ProfileIconId = Int(r, "profileIconId"),
-                Puuid = Str(r, "puuid")
+                Puuid = Str(r, "puuid"),
+                AccountId = Long(r, "accountId"),
+                IsSelf = isSelf
             };
         }
         catch
@@ -120,11 +133,17 @@ public class ProfileService
         }
     }
 
-    public async Task<List<RankEntry>> GetRanksAsync()
+    public Task<List<RankEntry>> GetRanksAsync() =>
+        ReadRanksAsync("lol-ranked/v1/current-ranked-stats");
+
+    public Task<List<RankEntry>> GetRanksForPuuidAsync(string puuid) =>
+        ReadRanksAsync($"lol-ranked/v1/ranked-stats/{puuid}");
+
+    private async Task<List<RankEntry>> ReadRanksAsync(string endpoint)
     {
         var result = new List<RankEntry>();
 
-        string? json = await _lcu.GetAsync("lol-ranked/v1/current-ranked-stats");
+        string? json = await _lcu.GetAsync(endpoint);
         if (string.IsNullOrEmpty(json)) return result;
 
         try
@@ -159,14 +178,72 @@ public class ProfileService
     /// Recent games. The history payload already carries every participant, so each match
     /// arrives with its full scoreboard and no follow-up request is needed.
     /// </summary>
-    public async Task<List<MatchSummary>> GetMatchHistoryAsync(string puuid, int count = 15)
+    public Task<List<MatchSummary>> GetMatchHistoryAsync(string puuid, int count = 15) =>
+        ReadHistoryAsync(
+            $"lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex={count - 1}",
+            puuid);
+
+    /// <summary>
+    /// Another player's recent games. Riot has tightened access to this over the years and
+    /// the surviving route differs by client build, so the known shapes are tried in turn.
+    /// Returns an empty list — not an error — when the client declines to answer.
+    /// </summary>
+    public async Task<List<MatchSummary>> GetMatchHistoryForPuuidAsync(
+        string puuid, long accountId, int count = 15)
+    {
+        var probe = new List<string>();
+
+        var candidates = new List<string>
+        {
+            $"lol-match-history/v1/products/lol/{puuid}/matches?begIndex=0&endIndex={count - 1}"
+        };
+
+        if (accountId > 0)
+            candidates.Add(
+                $"lol-match-history/v1/products/lol/accounts/{accountId}/matches?begIndex=0&endIndex={count - 1}");
+
+        foreach (var url in candidates)
+        {
+            var (status, body) = await _lcu.GetWithStatusAsync(url);
+            probe.Add($"{status,-4} {url}");
+
+            if (status != 200 || string.IsNullOrEmpty(body)) continue;
+
+            var matches = ParseHistory(body, puuid);
+            if (matches.Count > 0) return matches;
+        }
+
+        SaveProbe(probe);
+        return new List<MatchSummary>();
+    }
+
+    /// <summary>Where the tried endpoints are recorded when another player's history fails.</summary>
+    public static string DiagnosticPath => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "ronaldo", "match-history-probe.txt");
+
+    private static void SaveProbe(List<string> lines)
+    {
+        try
+        {
+            string path = DiagnosticPath;
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+            System.IO.File.WriteAllText(path,
+                "No match-history endpoint answered for another player. Tried:\n  " +
+                string.Join("\n  ", lines));
+        }
+        catch { }
+    }
+
+    private async Task<List<MatchSummary>> ReadHistoryAsync(string endpoint, string puuid)
+    {
+        string? json = await _lcu.GetAsync(endpoint);
+        return string.IsNullOrEmpty(json) ? new List<MatchSummary>() : ParseHistory(json, puuid);
+    }
+
+    private static List<MatchSummary> ParseHistory(string json, string puuid)
     {
         var matches = new List<MatchSummary>();
-
-        string? json = await _lcu.GetAsync(
-            $"lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex={count - 1}");
-
-        if (string.IsNullOrEmpty(json)) return matches;
 
         try
         {

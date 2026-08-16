@@ -30,6 +30,7 @@ public class LivePlayerViewModel
         WinRateText = player.WinRateText;
         MasteryText = player.MasteryText;
         PositionText = player.Position.ToUpperInvariant();
+        Puuid = player.Puuid;
     }
 
     /// <summary>Champion portraits live alongside the other game assets.</summary>
@@ -53,6 +54,10 @@ public class LivePlayerViewModel
     public string MasteryText { get; }
     public string PositionText { get; }
     public bool IsLocalPlayer { get; }
+    public string Puuid { get; } = "";
+
+    /// <summary>Only players the client identified can have a profile opened.</summary>
+    public bool CanOpenProfile => Puuid.Length > 0;
 
     public bool HasRank => RankText.Length > 0;
     public bool HasWinRate => WinRateText.Length > 0;

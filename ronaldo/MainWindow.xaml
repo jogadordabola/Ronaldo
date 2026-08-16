@@ -263,12 +263,17 @@
         <!-- One player in the live game, laid out like the loading screen -->
         <DataTemplate x:Key="LivePlayerTemplate">
             <Border Margin="5" CornerRadius="8" Padding="10,9" Width="212"
-                    BorderThickness="1">
+                    BorderThickness="1" Cursor="Hand" MouseLeftButtonUp="LivePlayer_Click"
+                    ToolTip="Open this player's profile">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Background" Value="{StaticResource BgCard}"/>
                         <Setter Property="BorderBrush" Value="{StaticResource Edge}"/>
                         <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource BgCardHot}"/>
+                                <Setter Property="BorderBrush" Value="#4A3D6B"/>
+                            </Trigger>
                             <!-- Highlight the local player, as the loading screen does -->
                             <DataTrigger Binding="{Binding IsLocalPlayer}" Value="True">
                                 <Setter Property="Background" Value="{StaticResource BgCardOn}"/>
@@ -759,8 +764,12 @@
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
 
+                    <ui:TextBlock Text="Click a player to open their profile"
+                                  Style="{StaticResource Caption}"
+                                  Foreground="{StaticResource Violet}"
+                                  HorizontalAlignment="Center" Margin="0,18,0,0"/>
                     <ui:TextBlock x:Name="InGameNote" Text="" Style="{StaticResource Caption}"
-                                  HorizontalAlignment="Center" Margin="0,20,0,0"
+                                  HorizontalAlignment="Center" Margin="0,8,0,0"
                                   TextWrapping="Wrap" MaxWidth="700" TextAlignment="Center"/>
                 </StackPanel>
             </Grid>

@@ -46,6 +46,7 @@ public partial class MainWindow
     private bool _inChampSelect;
     private bool _gameWasRunning;
     private bool _inGame;
+    private string? _viewingPuuid;
     private long _shownGameId;
 
     public MainWindow() : this(AppSettings.Load()) { }
@@ -737,12 +738,29 @@ public partial class MainWindow
 
     private async void ProfileBtn_Click(object sender, RoutedEventArgs e)
     {
-        // Toggle: a second click closes it again.
-        if (ProfilePanel.Visibility == Visibility.Visible)
+        // Toggle: a second click closes it again, unless another player's profile is open.
+        if (ProfilePanel.Visibility == Visibility.Visible && _viewingPuuid == null)
         {
             CloseProfile();
             return;
         }
+
+        await OpenProfileAsync(null, null);
+    }
+
+    /// <summary>Clicking a player in the live game opens their profile.</summary>
+    private async void LivePlayer_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.DataContext is not LivePlayerViewModel vm) return;
+        if (!vm.CanOpenProfile) return;
+
+        await OpenProfileAsync(vm.Puuid, vm.Name);
+    }
+
+    /// <param name="puuid">Whose profile to show, or null for your own.</param>
+    private async Task OpenProfileAsync(string? puuid, string? knownName)
+    {
+        _viewingPuuid = puuid;
 
         ProfilePanel.Visibility = Visibility.Visible;
         ProfileHint.Visibility = Visibility.Visible;
@@ -750,73 +768,103 @@ public partial class MainWindow
         // The champion bar is about champ select, which has nothing to do with the profile.
         TopBar.Visibility = Visibility.Collapsed;
 
+        // Clear the previous occupant so nothing stale flashes up.
+        RankList.ItemsSource = null;
+        MatchList.ItemsSource = null;
+        ProfileName.Text = knownName ?? "Loading...";
+        ProfileLevel.Text = "";
+        ProfileIcon.Source = null;
+
         if (!_lcu.IsConnected)
         {
-            ProfileName.Text = "Not connected";
-            ProfileLevel.Text = "";
+            // Keep whatever name we already knew rather than blanking it out.
+            ProfileName.Text = knownName ?? "Not connected";
             ProfileHint.Text = "Waiting for the League client...";
             return;
         }
 
         ProfileHint.Text = "Loading profile...";
-
-        await LoadProfileAsync();
+        await LoadProfileAsync(puuid, knownName);
     }
 
     private void HomeBtn_Click(object sender, RoutedEventArgs e) => CloseProfile();
 
     private void CloseProfile()
     {
+        _viewingPuuid = null;
         ProfilePanel.Visibility = Visibility.Collapsed;
         TopBar.Visibility = Visibility.Visible;
     }
 
-    private async Task LoadProfileAsync()
+    private async Task LoadProfileAsync(string? puuid, string? knownName)
     {
         if (!_lcu.IsConnected) return;
 
-        var summoner = await _profile.GetSummonerAsync();
+        bool isSelf = puuid == null;
+
+        var summoner = isSelf
+            ? await _profile.GetSummonerAsync()
+            : await _profile.GetSummonerByPuuidAsync(puuid!);
+
         if (summoner == null)
         {
-            Dispatcher.Invoke(() => ProfileHint.Text = "Could not read your profile from the client.");
+            Dispatcher.Invoke(() => ProfileHint.Text = isSelf
+                ? "Could not read your profile from the client."
+                : "The client would not resolve that player.");
             return;
         }
 
-        var ranks = await _profile.GetRanksAsync();
-        var matches = await _profile.GetMatchHistoryAsync(summoner.Puuid);
+        var ranks = isSelf
+            ? await _profile.GetRanksAsync()
+            : await _profile.GetRanksForPuuidAsync(summoner.Puuid);
 
-        // LP is only known for games this app watched finish; the client keeps no history.
-        foreach (var m in matches.Where(m => m.IsRanked))
-            m.LpDelta = _lpTracker.GetDelta(m.GameId);
+        var matches = isSelf
+            ? await _profile.GetMatchHistoryAsync(summoner.Puuid)
+            : await _profile.GetMatchHistoryForPuuidAsync(summoner.Puuid, summoner.AccountId);
+
+        // LP is only known for games this app watched finish, which means our own.
+        if (isSelf)
+            foreach (var m in matches.Where(m => m.IsRanked))
+                m.LpDelta = _lpTracker.GetDelta(m.GameId);
 
         // Champion and item icons for every match, so the list renders in one go.
         await IconCache.PreloadAsync(
             matches.SelectMany(m => MatchViewModel.IconPathsFor(_lcu, m))
                    .Append(ProfileIconPath(summoner.ProfileIconId)));
 
-        string puuid = summoner.Puuid;
+        string viewedPuuid = summoner.Puuid;
+        int matchCount = matches.Count;
 
         Dispatcher.Invoke(() =>
         {
-            ProfileName.Text = summoner.Name.Length > 0 ? summoner.Name : "Unknown summoner";
-            ProfileLevel.Text = summoner.Level > 0 ? $"Level {summoner.Level}" : "";
+            ProfileName.Text = summoner.Name.Length > 0
+                ? summoner.Name
+                : knownName ?? "Unknown summoner";
+
+            ProfileLevel.Text = summoner.Level > 0
+                ? (isSelf ? $"Level {summoner.Level}" : $"Level {summoner.Level} · viewing another player")
+                : (isSelf ? "" : "Viewing another player");
             ProfileIcon.Source = IconCache.Get(ProfileIconPath(summoner.ProfileIconId));
 
             RankList.ItemsSource = ranks.Select(r => new RankEntryViewModel(r)).ToList();
             MatchList.ItemsSource = matches
                 .Select(m => new MatchViewModel(_lcu, m,
-                    gameId => _profile.GetMatchDetailAsync(gameId, puuid)))
+                    gameId => _profile.GetMatchDetailAsync(gameId, viewedPuuid)))
                 .ToList();
 
-            if (matches.Count > 0)
+            if (matchCount > 0)
             {
                 ProfileHint.Visibility = Visibility.Collapsed;
             }
             else
             {
                 ProfileHint.Visibility = Visibility.Visible;
-                ProfileHint.Text = "No match history came back from the client. " +
-                                   "It only serves recent games, and none were returned.";
+                ProfileHint.Text = isSelf
+                    ? "No match history came back from the client. " +
+                      "It only serves recent games, and none were returned."
+                    : "The client would not share this player's match history. Riot restricts " +
+                      "this for other players, so it may simply be unavailable.\n\n" +
+                      $"Endpoints tried are listed in {ProfileService.DiagnosticPath}";
             }
         });
     }
