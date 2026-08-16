@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace viktor.Stats;
+namespace ronaldo.Stats;
 
 /// <summary>
 /// Resolves the live patch number, which Lolalytics requires on every request.

@@ -2,7 +2,7 @@
 using System.Data;
 using System.Windows;
 
-namespace viktor
+namespace ronaldo
 {
     /// <summary>
     /// Interaction logic for App.xaml

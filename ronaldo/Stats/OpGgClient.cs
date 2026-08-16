@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace viktor.Stats;
+namespace ronaldo.Stats;
 
 /// <summary>A complete rune page as op.gg reports it, with its own sample size.</summary>
 public class OpGgRunePage

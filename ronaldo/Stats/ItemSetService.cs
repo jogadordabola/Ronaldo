@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
-namespace viktor.Stats;
+namespace ronaldo.Stats;
 
 /// <summary>
 /// Writes the shown build into the League client as an in-game item set, and removes it again
@@ -16,7 +16,10 @@ namespace viktor.Stats;
 /// </summary>
 public class ItemSetService
 {
-    public const string TitlePrefix = "Viktor · ";
+    public const string TitlePrefix = "Ronaldo · ";
+
+    /// <summary>Sets written under the app's former name, still cleaned up so none are orphaned.</summary>
+    private const string LegacyTitlePrefix = "Viktor · ";
 
     private readonly LcuService _lcu;
     private long _summonerId;
@@ -95,9 +98,10 @@ public class ItemSetService
     private static int RemoveOurSets(JsonArray sets)
     {
         var ours = sets
-            .Select((node, index) => (node, index))
-            .Where(x => (x.node?["title"]?.GetValue<string>() ?? "").StartsWith(TitlePrefix, StringComparison.Ordinal))
-            .Select(x => x.index)
+            .Select((node, index) => (Title: node?["title"]?.GetValue<string>() ?? "", Index: index))
+            .Where(x => x.Title.StartsWith(TitlePrefix, StringComparison.Ordinal) ||
+                        x.Title.StartsWith(LegacyTitlePrefix, StringComparison.Ordinal))
+            .Select(x => x.Index)
             .OrderByDescending(i => i)
             .ToList();
 

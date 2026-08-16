@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace viktor.Stats;
+namespace ronaldo.Stats;
 
 /// <summary>
 /// Turns a loose set of rune ids from an external source into a page the LCU will accept:

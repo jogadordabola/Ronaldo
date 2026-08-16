@@ -8,11 +8,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using viktor.Stats;
+using ronaldo.Stats;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 
-namespace viktor;
+namespace ronaldo;
 
 public partial class MainWindow
 {
@@ -22,7 +22,10 @@ public partial class MainWindow
     private readonly System.Timers.Timer _pollTimer = new(350);
 
     /// <summary>Name used for the rune page this app writes, so it never clobbers a user's own pages.</summary>
-    private const string ManagedPageName = "Viktor Build";
+    private const string ManagedPageName = "Ronaldo Build";
+
+    /// <summary>The page name used before the app was renamed, still cleaned up so none are left behind.</summary>
+    private const string LegacyPageName = "Viktor Build";
 
     /// <summary>Accent used for toggles, buttons and focus states, to match the card palette.</summary>
     private static readonly Color AccentColor = Color.FromRgb(0x9F, 0x7A, 0xEA);
@@ -509,7 +512,9 @@ public partial class MainWindow
             foreach (var p in doc.RootElement.EnumerateArray())
             {
                 if (!p.TryGetProperty("name", out var n)) continue;
-                if (n.GetString() != ManagedPageName) continue;
+
+                string pageName = n.GetString() ?? "";
+                if (pageName != ManagedPageName && pageName != LegacyPageName) continue;
                 if (p.TryGetProperty("isDeletable", out var del) && !del.GetBoolean()) continue;
                 ids.Add(p.GetProperty("id").GetInt32());
             }

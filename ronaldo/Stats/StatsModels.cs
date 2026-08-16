@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace viktor.Stats;
+namespace ronaldo.Stats;
 
 /// <summary>An item build path, optionally conditioned on a specific keystone.</summary>
 public class ItemBuild

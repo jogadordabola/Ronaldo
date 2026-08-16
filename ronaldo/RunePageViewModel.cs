@@ -5,9 +5,9 @@ using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
-using viktor.Stats;
+using ronaldo.Stats;
 
-namespace viktor;
+namespace ronaldo;
 
 /// <summary>One icon plus the name shown in its tooltip.</summary>
 public class IconItem

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace viktor.Stats;
+namespace ronaldo.Stats;
 
 public enum Lane { Top, Jungle, Mid, Bottom, Support }
 

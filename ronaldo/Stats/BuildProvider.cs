@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace viktor.Stats;
+namespace ronaldo.Stats;
 
 /// <summary>
 /// Assembles the champion build shown in the UI: several rune pages ranked by pick rate,

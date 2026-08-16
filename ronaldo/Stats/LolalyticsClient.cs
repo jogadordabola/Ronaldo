@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace viktor.Stats;
+namespace ronaldo.Stats;
 
 public class LolaItemBuild
 {

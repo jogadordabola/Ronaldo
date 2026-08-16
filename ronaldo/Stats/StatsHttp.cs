@@ -4,7 +4,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace viktor.Stats;
+namespace ronaldo.Stats;
 
 /// <summary>
 /// Shared outbound HTTP client for the stats sources. Both u.gg's CDN and Lolalytics

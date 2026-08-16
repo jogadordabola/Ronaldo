@@ -8,9 +8,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using viktor.Stats;
+using ronaldo.Stats;
 
-namespace viktor;
+namespace ronaldo;
 
 /// <summary>
 /// Resolves game asset icons (items, runes, trees, summoner spells) to images.
@@ -30,7 +30,7 @@ public static class IconCache
     private static readonly SemaphoreSlimWrapper Throttle = new(8);
 
     private static readonly string DiskDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "viktor", "icons");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ronaldo", "icons");
 
     /// <summary>Returns an already-loaded icon, or null if it hasn't been fetched yet.</summary>
     public static ImageSource? Get(string? iconPath)

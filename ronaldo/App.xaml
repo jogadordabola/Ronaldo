@@ -1,8 +1,8 @@
-<Application x:Class="viktor.App"
+<Application x:Class="ronaldo.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-             xmlns:local="clr-namespace:viktor"
+             xmlns:local="clr-namespace:ronaldo"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
