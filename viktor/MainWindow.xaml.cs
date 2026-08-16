@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using viktor.Stats;
 using Wpf.Ui.Appearance;
+using Wpf.Ui.Controls;
 
 namespace viktor;
 
@@ -31,9 +32,16 @@ public partial class MainWindow
 
     private bool _filtersReady;
 
+    /// <summary>Accent used for toggles, buttons and focus states, to match the card palette.</summary>
+    private static readonly System.Windows.Media.Color AccentColor =
+        System.Windows.Media.Color.FromRgb(0x9F, 0x7A, 0xEA);
+
     public MainWindow()
     {
         InitializeComponent();
+
+        ApplicationThemeManager.Apply(ApplicationTheme.Dark, WindowBackdropType.None, false);
+        ApplicationAccentColorManager.Apply(AccentColor, ApplicationTheme.Dark, false, false);
         ApplicationThemeManager.Apply(this);
 
         PopulateFilters();
@@ -263,7 +271,7 @@ public partial class MainWindow
         PatchBadge.Text = string.IsNullOrEmpty(data.Patch) ? "" : $"Patch {data.Patch}";
 
         string filters = $"{StatsCatalog.RankLabel(data.Rank)} · {StatsCatalog.RegionLabel(data.Region)}";
-        SourceText.Text = string.IsNullOrEmpty(data.StatusLine)
+        SourceLine.Text = string.IsNullOrEmpty(data.StatusLine)
             ? filters
             : $"{filters} · {data.StatusLine}";
 
@@ -287,9 +295,9 @@ public partial class MainWindow
 
         PagesList.ItemsSource = null;
         ChampNameText.Text = "In Lobby / In Game";
-        RoleBadge.Text = "";
+        RoleBadge.Text = "—";
         PatchBadge.Text = "";
-        SourceText.Text = "";
+        SourceLine.Text = "";
         EmptyHint.Visibility = Visibility.Visible;
         EmptyHint.Text = "Standby for champion select...";
     }

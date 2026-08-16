@@ -34,15 +34,15 @@ public class RunePageViewModel : INotifyPropertyChanged
         Label = page.Label;
         SourceText = page.Source;
 
-        PickRateText = page.PickRate > 0
-            ? page.PickRate.ToString("0.#", CultureInfo.InvariantCulture) + "% pick"
-            : "";
-        WinRateText = page.WinRate > 0
-            ? page.WinRate.ToString("0.0", CultureInfo.InvariantCulture) + "% WR"
-            : "";
-        GamesText = page.Games > 0
-            ? page.Games.ToString("N0", CultureInfo.InvariantCulture) + " games"
-            : "";
+        PickRateValue = page.PickRate > 0
+            ? page.PickRate.ToString("0.#", CultureInfo.InvariantCulture) + "%"
+            : "—";
+        WinRateValue = page.WinRate > 0
+            ? page.WinRate.ToString("0.0", CultureInfo.InvariantCulture) + "%"
+            : "—";
+        GamesValue = page.Games > 0
+            ? page.Games.ToString("N0", CultureInfo.InvariantCulture)
+            : "—";
 
         var items = page.Items;
         if (items != null)
@@ -72,7 +72,8 @@ public class RunePageViewModel : INotifyPropertyChanged
                 : $"Champion-wide build ({items.Source})";
 
             ItemsWinRateText = items.WinRate > 0
-                ? items.WinRate.ToString("0.0", CultureInfo.InvariantCulture) + "% WR on this build"
+                ? $"{items.WinRate.ToString("0.0", CultureInfo.InvariantCulture)}% win " +
+                  $"· {items.Games.ToString("N0", CultureInfo.InvariantCulture)} games"
                 : "";
         }
         else
@@ -90,9 +91,9 @@ public class RunePageViewModel : INotifyPropertyChanged
     public string SourceText { get; } = "";
     public string KeystoneName { get; } = "";
 
-    public string PickRateText { get; } = "";
-    public string WinRateText { get; } = "";
-    public string GamesText { get; } = "";
+    public string PickRateValue { get; } = "";
+    public string WinRateValue { get; } = "";
+    public string GamesValue { get; } = "";
 
     public string PrimaryTreeText { get; } = "";
     public string PrimaryRunesText { get; } = "";
@@ -123,11 +124,12 @@ public class RunePageViewModel : INotifyPropertyChanged
             if (_isApplied == value) return;
             _isApplied = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(AppliedBadge));
+            OnPropertyChanged(nameof(ActionHint));
         }
     }
 
-    public string AppliedBadge => _isApplied ? "APPLIED" : "CLICK TO APPLY";
+    /// <summary>Prompt shown in the card footer; blank once this page is the active one.</summary>
+    public string ActionHint => _isApplied ? "" : "CLICK TO APPLY";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
