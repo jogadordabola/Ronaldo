@@ -31,12 +31,50 @@
         <SolidColorBrush x:Key="Lilac"      Color="#D9BFF5"/>
         <SolidColorBrush x:Key="Periwinkle" Color="#A5B0F0"/>
         <SolidColorBrush x:Key="Mint"       Color="#8FD9BC"/>
+        <SolidColorBrush x:Key="Amber"      Color="#E8C68A"/>
 
-        <!-- Small uppercase section caption -->
         <Style x:Key="Caption" TargetType="ui:TextBlock">
             <Setter Property="FontTypography" Value="Caption"/>
             <Setter Property="Foreground" Value="{StaticResource TextLo}"/>
         </Style>
+
+        <!-- Glow behind the filter dropdowns so they don't read as default controls -->
+        <Style x:Key="GlowBox" TargetType="Border">
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#9F7AEA" BlurRadius="14" ShadowDepth="0" Opacity="0.35"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#B794F6" BlurRadius="20" ShadowDepth="0" Opacity="0.7"/>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A row of icons with names in tooltips -->
+        <DataTemplate x:Key="IconTemplate">
+            <Border Margin="0,0,4,0" CornerRadius="4" ToolTip="{Binding Name}">
+                <Image Source="{Binding Source}" Width="30" Height="30"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SmallIconTemplate">
+            <Border Margin="0,0,3,3" CornerRadius="4" ToolTip="{Binding Name}">
+                <Image Source="{Binding Source}" Width="24" Height="24"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+            </Border>
+        </DataTemplate>
+
+        <ItemsPanelTemplate x:Key="RowPanel">
+            <WrapPanel Orientation="Horizontal"/>
+        </ItemsPanelTemplate>
 
         <!-- One rune page and its build. Clicking anywhere on the card applies the page. -->
         <DataTemplate x:Key="RunePageTemplate">
@@ -66,7 +104,6 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Header: rank label, keystone, applied state -->
                     <StackPanel Grid.Row="0" Margin="14,12,14,10">
                         <Grid>
                             <Border HorizontalAlignment="Left" CornerRadius="4" Padding="7,2"
@@ -74,7 +111,6 @@
                                 <ui:TextBlock Text="{Binding Label}" FontTypography="Caption"
                                               Foreground="{StaticResource VioletLt}"/>
                             </Border>
-
                             <Border HorizontalAlignment="Right" CornerRadius="4" Padding="7,2"
                                     Visibility="{Binding IsApplied, Converter={StaticResource BoolToVis}}"
                                     Background="{StaticResource EdgeOn}">
@@ -82,11 +118,17 @@
                             </Border>
                         </Grid>
 
-                        <ui:TextBlock Text="{Binding KeystoneName}" FontTypography="Subtitle"
-                                      Foreground="{StaticResource TextHi}" TextWrapping="Wrap"
-                                      Margin="0,8,0,0"/>
+                        <!-- Keystone -->
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Border CornerRadius="24" Background="#191324" Padding="2">
+                                <Image Source="{Binding KeystoneIcon}" Width="44" Height="44"
+                                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                            </Border>
+                            <ui:TextBlock Text="{Binding KeystoneName}" FontTypography="Subtitle"
+                                          Foreground="{StaticResource TextHi}" TextWrapping="Wrap"
+                                          VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        </StackPanel>
 
-                        <!-- Stat strip -->
                         <Border Background="{StaticResource BgInset}" CornerRadius="6"
                                 Padding="10,7" Margin="0,10,0,0">
                             <Grid>
@@ -95,7 +137,6 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-
                                 <StackPanel Grid.Column="0">
                                     <ui:TextBlock Text="PICK" Style="{StaticResource Caption}"/>
                                     <ui:TextBlock Text="{Binding PickRateValue}" FontTypography="BodyStrong"
@@ -115,85 +156,80 @@
                         </Border>
                     </StackPanel>
 
-                    <!-- Runes and items -->
                     <StackPanel Grid.Row="1" Margin="14,0,14,0">
-                        <ui:TextBlock Text="{Binding PrimaryTreeText}" Style="{StaticResource Caption}"
-                                      Foreground="{StaticResource Periwinkle}"/>
-                        <ui:TextBlock Text="{Binding PrimaryRunesText}" FontTypography="Body"
-                                      Foreground="{StaticResource TextMid}" TextWrapping="Wrap"
-                                      Margin="0,2,0,8"/>
+                        <!-- Runes -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <Image Source="{Binding PrimaryTreeIcon}" Width="16" Height="16"/>
+                            <ui:TextBlock Text="{Binding PrimaryTreeText}" Style="{StaticResource Caption}"
+                                          Foreground="{StaticResource Periwinkle}" Margin="5,0,0,0"/>
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding PrimaryRunes}" Margin="0,0,0,7"
+                                      ItemTemplate="{StaticResource IconTemplate}"
+                                      ItemsPanel="{StaticResource RowPanel}"/>
 
-                        <ui:TextBlock Text="{Binding SecondaryTreeText}" Style="{StaticResource Caption}"
-                                      Foreground="{StaticResource Lilac}"/>
-                        <ui:TextBlock Text="{Binding SecondaryRunesText}" FontTypography="Body"
-                                      Foreground="{StaticResource TextMid}" TextWrapping="Wrap"
-                                      Margin="0,2,0,8"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <Image Source="{Binding SecondaryTreeIcon}" Width="16" Height="16"/>
+                            <ui:TextBlock Text="{Binding SecondaryTreeText}" Style="{StaticResource Caption}"
+                                          Foreground="{StaticResource Lilac}" Margin="5,0,0,0"/>
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding SecondaryRunes}" Margin="0,0,0,7"
+                                      ItemTemplate="{StaticResource IconTemplate}"
+                                      ItemsPanel="{StaticResource RowPanel}"/>
 
-                        <ui:TextBlock Text="SHARDS" Style="{StaticResource Caption}"/>
-                        <ui:TextBlock Text="{Binding ShardsText}" FontTypography="Body"
-                                      Foreground="{StaticResource TextMid}" TextWrapping="Wrap"
-                                      Margin="0,2,0,10"/>
+                        <ui:TextBlock Text="SHARDS" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
+                        <ItemsControl ItemsSource="{Binding Shards}" Margin="0,0,0,8"
+                                      ItemTemplate="{StaticResource SmallIconTemplate}"
+                                      ItemsPanel="{StaticResource RowPanel}"/>
 
-                        <Border Height="1" Background="{StaticResource Divider}" Margin="0,0,0,10"/>
+                        <Border Height="1" Background="{StaticResource Divider}" Margin="0,0,0,8"/>
 
-                        <!-- Item build for this keystone -->
-                        <Grid Margin="0,0,0,5">
-                            <ui:TextBlock Text="{Binding ItemsNote}" Style="{StaticResource Caption}"
-                                          Foreground="{StaticResource Lilac}" HorizontalAlignment="Left"
-                                          TextWrapping="Wrap"/>
-                        </Grid>
-
-                        <ui:TextBlock Text="{Binding CoreItemsText}" FontTypography="BodyStrong"
-                                      Foreground="{StaticResource TextHi}" TextWrapping="Wrap"
-                                      Margin="0,0,0,3"/>
+                        <!-- Items -->
+                        <ui:TextBlock Text="{Binding ItemsNote}" Style="{StaticResource Caption}"
+                                      Foreground="{StaticResource Lilac}" TextWrapping="Wrap"
+                                      Margin="0,0,0,5"/>
+                        <ItemsControl ItemsSource="{Binding CoreItems}"
+                                      ItemTemplate="{StaticResource IconTemplate}"
+                                      ItemsPanel="{StaticResource RowPanel}"/>
                         <ui:TextBlock Text="{Binding ItemsWinRateText}" Style="{StaticResource Caption}"
-                                      Margin="0,0,0,10"/>
+                                      Margin="0,4,0,8"/>
 
-                        <Grid Margin="0,0,0,8">
+                        <Grid Margin="0,0,0,9">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto" MinWidth="96"/>
+                                <ColumnDefinition Width="Auto" MinWidth="70"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                <ui:TextBlock Text="STARTERS" Style="{StaticResource Caption}"/>
-                                <ui:TextBlock Text="{Binding StartersText}" FontTypography="Body"
-                                              Foreground="{StaticResource TextMid}" TextWrapping="Wrap"/>
+                                <ui:TextBlock Text="STARTERS" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
+                                <ItemsControl ItemsSource="{Binding StarterItems}"
+                                              ItemTemplate="{StaticResource SmallIconTemplate}"
+                                              ItemsPanel="{StaticResource RowPanel}"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1">
-                                <ui:TextBlock Text="BOOTS" Style="{StaticResource Caption}"/>
-                                <ui:TextBlock Text="{Binding BootsText}" FontTypography="Body"
-                                              Foreground="{StaticResource TextMid}" TextWrapping="Wrap"/>
+                                <ui:TextBlock Text="BOOTS" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
+                                <ItemsControl ItemsSource="{Binding Boots}"
+                                              ItemTemplate="{StaticResource SmallIconTemplate}"
+                                              ItemsPanel="{StaticResource RowPanel}"/>
                             </StackPanel>
                         </Grid>
 
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto" MinWidth="96"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                <ui:TextBlock Text="SKILL MAX" Style="{StaticResource Caption}"/>
-                                <ui:TextBlock Text="{Binding SkillOrderText}" FontTypography="BodyStrong"
-                                              Foreground="{StaticResource TextHi}"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1"
-                                        Visibility="{Binding HasSpells, Converter={StaticResource BoolToVis}}">
-                                <ui:TextBlock Text="SUMMONERS" Style="{StaticResource Caption}"/>
-                                <ui:TextBlock Text="{Binding SpellsText}" FontTypography="Body"
-                                              Foreground="{StaticResource TextMid}" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Grid>
+                        <StackPanel Visibility="{Binding HasSpells, Converter={StaticResource BoolToVis}}"
+                                    Margin="0,0,0,9">
+                            <ui:TextBlock Text="SUMMONERS" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
+                            <ItemsControl ItemsSource="{Binding Spells}"
+                                          ItemTemplate="{StaticResource SmallIconTemplate}"
+                                          ItemsPanel="{StaticResource RowPanel}"/>
+                        </StackPanel>
 
                         <StackPanel Visibility="{Binding HasSituational, Converter={StaticResource BoolToVis}}">
-                            <ui:TextBlock Text="SITUATIONAL" Style="{StaticResource Caption}"/>
-                            <ui:TextBlock Text="{Binding SituationalText}" FontTypography="Body"
-                                          Foreground="{StaticResource TextLo}" TextWrapping="Wrap"/>
+                            <ui:TextBlock Text="SITUATIONAL" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
+                            <ItemsControl ItemsSource="{Binding Situational}"
+                                          ItemTemplate="{StaticResource SmallIconTemplate}"
+                                          ItemsPanel="{StaticResource RowPanel}"/>
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Footer -->
                     <Border Grid.Row="2" Background="{StaticResource BgInset}" CornerRadius="0,0,9,9"
-                            Padding="14,7" Margin="0,12,0,0">
+                            Padding="14,6" Margin="0,8,0,0">
                         <Grid>
                             <ui:TextBlock Text="{Binding SourceText}" Style="{StaticResource Caption}"
                                           HorizontalAlignment="Left"/>
@@ -214,9 +250,49 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="VIKTOR" ShowMaximize="True"/>
+        <Grid Grid.Row="0">
+            <ui:TitleBar Title="VIKTOR" ShowMaximize="True"/>
 
-        <!-- Top bar: champion on the left, filters on the right -->
+            <!-- Settings sits left of the caption buttons -->
+            <Button x:Name="SettingsBtn" Click="SettingsBtn_Click"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="0,4,142,0" Width="34" Height="30"
+                    Background="Transparent" BorderThickness="0" Cursor="Hand"
+                    ToolTip="Settings">
+                <ui:SymbolIcon Symbol="Settings24" FontSize="17" Foreground="{StaticResource TextMid}"/>
+            </Button>
+
+            <Popup x:Name="SettingsPopup" PlacementTarget="{Binding ElementName=SettingsBtn}"
+                   Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+                   HorizontalOffset="-250" VerticalOffset="6">
+                <Border Background="{StaticResource BgPanel}" CornerRadius="10" Padding="16"
+                        BorderBrush="{StaticResource Edge}" BorderThickness="1" Width="300">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="24" ShadowDepth="4" Opacity="0.6"/>
+                    </Border.Effect>
+                    <StackPanel>
+                        <ui:TextBlock Text="SETTINGS" Style="{StaticResource Caption}"
+                                      Foreground="{StaticResource VioletLt}" Margin="0,0,0,12"/>
+
+                        <ui:ToggleSwitch x:Name="AutoAcceptToggle" Content="Auto-accept queue"
+                                         IsChecked="True" Margin="0,0,0,10"/>
+                        <ui:ToggleSwitch x:Name="AutoApplyToggle" Content="Auto-apply top rune page"
+                                         IsChecked="True" Margin="0,0,0,10"/>
+                        <ui:ToggleSwitch x:Name="ItemSetToggle" Content="Import item set in game"
+                                         IsChecked="False" Margin="0,0,0,4"/>
+                        <ui:TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                      Text="Adds the build to your in-game shop and deletes it again once the game ends."
+                                      Margin="0,0,0,12"/>
+
+                        <Border Height="1" Background="{StaticResource Divider}" Margin="0,0,0,12"/>
+                        <ui:TextBlock x:Name="SettingsStatus" Style="{StaticResource Caption}"
+                                      TextWrapping="Wrap" Text=""/>
+                    </StackPanel>
+                </Border>
+            </Popup>
+        </Grid>
+
+        <!-- Top bar -->
         <Border Grid.Row="1" Background="{StaticResource BgPanel}" CornerRadius="10"
                 BorderBrush="{StaticResource Edge}" BorderThickness="1" Margin="16,4,16,12"
                 Padding="18,14">
@@ -246,20 +322,31 @@
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <StackPanel Margin="0,0,12,0">
+                        <ui:TextBlock Text="ROLE" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
+                        <Border Style="{StaticResource GlowBox}">
+                            <ComboBox x:Name="LaneCombo" Width="128"
+                                      SelectionChanged="Filter_SelectionChanged"/>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,12,0">
                         <ui:TextBlock Text="RANK" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="RankCombo" Width="150"
-                                  SelectionChanged="Filter_SelectionChanged"/>
+                        <Border Style="{StaticResource GlowBox}">
+                            <ComboBox x:Name="RankCombo" Width="146"
+                                      SelectionChanged="Filter_SelectionChanged"/>
+                        </Border>
                     </StackPanel>
                     <StackPanel>
                         <ui:TextBlock Text="REGION" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="RegionCombo" Width="130"
-                                  SelectionChanged="Filter_SelectionChanged"/>
+                        <Border Style="{StaticResource GlowBox}">
+                            <ComboBox x:Name="RegionCombo" Width="122"
+                                      SelectionChanged="Filter_SelectionChanged"/>
+                        </Border>
                     </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Rune pages, side by side -->
+        <!-- Rune pages -->
         <Grid Grid.Row="2" Margin="10,0,10,0">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl x:Name="PagesList" ItemTemplate="{StaticResource RunePageTemplate}">
@@ -271,12 +358,91 @@
                 </ItemsControl>
             </ScrollViewer>
 
-            <ui:TextBlock x:Name="EmptyHint" Text="Standby for champion select..."
-                          FontTypography="Body" Foreground="{StaticResource TextLo}"
-                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- Idle state -->
+            <Grid x:Name="IdlePanel" Visibility="Visible">
+                <Grid.Background>
+                    <RadialGradientBrush GradientOrigin="0.5,0.45" Center="0.5,0.45"
+                                         RadiusX="0.75" RadiusY="0.75">
+                        <GradientStop Color="#241C3A" Offset="0"/>
+                        <GradientStop Color="#14111B" Offset="1"/>
+                    </RadialGradientBrush>
+                </Grid.Background>
+
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- Pulsing emblem -->
+                    <Grid Width="190" Height="190" HorizontalAlignment="Center">
+                        <Ellipse x:Name="PulseRing" Width="190" Height="190" Opacity="0.30">
+                            <Ellipse.Fill>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="#00000000" Offset="0.55"/>
+                                    <GradientStop Color="#9F7AEA" Offset="0.78"/>
+                                    <GradientStop Color="#00000000" Offset="1"/>
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
+                            <Ellipse.RenderTransform>
+                                <ScaleTransform x:Name="PulseScale" CenterX="95" CenterY="95"
+                                                ScaleX="1" ScaleY="1"/>
+                            </Ellipse.RenderTransform>
+                            <Ellipse.Triggers>
+                                <EventTrigger RoutedEvent="Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                            <DoubleAnimation Storyboard.TargetName="PulseScale"
+                                                             Storyboard.TargetProperty="ScaleX"
+                                                             From="0.9" To="1.08" Duration="0:0:2.4"/>
+                                            <DoubleAnimation Storyboard.TargetName="PulseScale"
+                                                             Storyboard.TargetProperty="ScaleY"
+                                                             From="0.9" To="1.08" Duration="0:0:2.4"/>
+                                            <DoubleAnimation Storyboard.TargetName="PulseRing"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             From="0.20" To="0.55" Duration="0:0:2.4"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Ellipse.Triggers>
+                        </Ellipse>
+
+                        <Border Width="104" Height="104" CornerRadius="52"
+                                Background="#221D30" BorderBrush="{StaticResource EdgeOn}"
+                                BorderThickness="2" HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                            <ui:TextBlock Text="V" FontSize="46" FontWeight="Bold"
+                                          Foreground="{StaticResource VioletLt}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+
+                    <ui:TextBlock x:Name="IdleTitle" Text="Waiting for champion select"
+                                  FontTypography="Title" Foreground="{StaticResource TextHi}"
+                                  HorizontalAlignment="Center" Margin="0,22,0,0"/>
+                    <ui:TextBlock x:Name="IdleSubtitle"
+                                  Text="Hover or lock a champion and your builds appear here."
+                                  FontTypography="Body" Foreground="{StaticResource TextLo}"
+                                  HorizontalAlignment="Center" Margin="0,8,0,0"/>
+
+                    <!-- Active settings at a glance -->
+                    <ItemsControl x:Name="IdleChips" Margin="0,22,0,0" HorizontalAlignment="Center">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border CornerRadius="12" Padding="12,5" Margin="4,0"
+                                        Background="#241E36" BorderBrush="{StaticResource Edge}"
+                                        BorderThickness="1">
+                                    <ui:TextBlock Text="{Binding}" FontTypography="Caption"
+                                                  Foreground="{StaticResource TextMid}"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Grid>
         </Grid>
 
-        <!-- Footer controls -->
+        <!-- Footer -->
         <Border Grid.Row="3" Background="{StaticResource BgPanel}" CornerRadius="10"
                 BorderBrush="{StaticResource Edge}" BorderThickness="1" Margin="16,12,16,16"
                 Padding="18,12">
@@ -288,18 +454,18 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <ui:ToggleSwitch x:Name="AutoAcceptToggle" Content="Auto-Accept Queue"
-                                     IsChecked="True" Margin="0,0,22,0"/>
-                    <ui:ToggleSwitch x:Name="AutoApplyToggle" Content="Auto-Apply Top Page"
-                                     IsChecked="True"/>
+                    <Ellipse x:Name="ConnDot" Width="9" Height="9" Fill="{StaticResource TextLo}"
+                             VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ui:TextBlock x:Name="StatusText" Text="Waiting for League Client..."
+                                  Style="{StaticResource Caption}" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <ui:TextBlock Grid.Column="1" x:Name="StatusText" Text="Waiting for League Client..."
+                <ui:TextBlock Grid.Column="1" x:Name="HintText" Text=""
                               Style="{StaticResource Caption}" VerticalAlignment="Center"
                               HorizontalAlignment="Center" TextWrapping="Wrap"/>
 
                 <ui:Button Grid.Column="2" x:Name="ImportBtn" Content="Re-Import Selected Runes"
-                           Click="ImportBtn_Click" MinWidth="200"
+                           Click="ImportBtn_Click" MinWidth="200" Visibility="Collapsed"
                            Background="{StaticResource Violet}" Foreground="#17131F"
                            BorderBrush="{StaticResource VioletLt}" FontWeight="SemiBold"/>
             </Grid>

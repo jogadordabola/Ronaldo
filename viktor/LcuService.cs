@@ -27,6 +27,14 @@ public class LcuService
     /// <summary>Rune id -> its slot row within its tree (0 = keystone). Used to order a page correctly.</summary>
     public Dictionary<int, int> PerkSlotOf { get; } = new();
 
+    public Dictionary<int, string> SpellNames { get; } = new();
+
+    // Icon paths as the game data reports them, e.g. "/lol-game-data/assets/ASSETS/Items/...png".
+    public Dictionary<int, string> PerkIcons { get; } = new();
+    public Dictionary<int, string> StyleIcons { get; } = new();
+    public Dictionary<int, string> ItemIcons { get; } = new();
+    public Dictionary<int, string> SpellIcons { get; } = new();
+
     public async Task<bool> TryConnectAsync()
     {
         var process = Process.GetProcessesByName("LeagueClientUx").FirstOrDefault();
@@ -96,8 +104,12 @@ public class LcuService
                 using var doc = JsonDocument.Parse(perksJson);
                 foreach (var item in doc.RootElement.EnumerateArray())
                 {
-                    int id = item.GetProperty("id").GetInt32();
+                    if (!item.TryGetProperty("id", out var idEl) || !idEl.TryGetInt32(out int id) || id <= 0)
+                        continue;
+
                     PerkNames[id] = item.GetProperty("name").GetString() ?? $"Rune #{id}";
+                    if (item.TryGetProperty("iconPath", out var icon))
+                        PerkIcons[id] = icon.GetString() ?? "";
                 }
             }
 
@@ -113,6 +125,8 @@ public class LcuService
                     {
                         int styleId = item.GetProperty("id").GetInt32();
                         StyleNames[styleId] = item.GetProperty("name").GetString() ?? "Style";
+                        if (item.TryGetProperty("iconPath", out var styleIcon))
+                            StyleIcons[styleId] = styleIcon.GetString() ?? "";
 
                         // Record which tree each rune lives in and which row it sits on, so a
                         // page coming from an external source can be ordered the way the LCU
@@ -147,8 +161,30 @@ public class LcuService
                 using var doc = JsonDocument.Parse(itemsJson);
                 foreach (var item in doc.RootElement.EnumerateArray())
                 {
-                    int id = item.GetProperty("id").GetInt32();
+                    if (!item.TryGetProperty("id", out var idEl) || !idEl.TryGetInt32(out int id) || id <= 0)
+                        continue;
+
                     ItemNames[id] = item.GetProperty("name").GetString() ?? $"Item #{id}";
+                    if (item.TryGetProperty("iconPath", out var icon))
+                        ItemIcons[id] = icon.GetString() ?? "";
+                }
+            }
+
+            // 5. Summoner spells
+            string? spellsJson = await GetAsync("lol-game-data/assets/v1/summoner-spells.json");
+            if (!string.IsNullOrEmpty(spellsJson))
+            {
+                using var doc = JsonDocument.Parse(spellsJson);
+                foreach (var item in doc.RootElement.EnumerateArray())
+                {
+                    // Some entries carry a placeholder id of 4294967295 ("Primal Smite"),
+                    // which overflows Int32 — skip them rather than aborting the whole load.
+                    if (!item.TryGetProperty("id", out var idEl) || !idEl.TryGetInt32(out int id) || id <= 0)
+                        continue;
+
+                    SpellNames[id] = item.GetProperty("name").GetString() ?? $"Spell #{id}";
+                    if (item.TryGetProperty("iconPath", out var icon))
+                        SpellIcons[id] = icon.GetString() ?? "";
                 }
             }
         }
@@ -178,6 +214,22 @@ public class LcuService
         {
             var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
             var res = await _httpClient.PostAsync(endpoint, content);
+            return res.IsSuccessStatusCode;
+        }
+        catch
+        {
+            _httpClient = null;
+            return false;
+        }
+    }
+
+    public async Task<bool> PutAsync(string endpoint, string jsonBody)
+    {
+        if (_httpClient == null) return false;
+        try
+        {
+            var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+            var res = await _httpClient.PutAsync(endpoint, content);
             return res.IsSuccessStatusCode;
         }
         catch

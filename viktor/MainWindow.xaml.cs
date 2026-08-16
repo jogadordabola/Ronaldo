@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using viktor.Stats;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
@@ -17,24 +18,26 @@ public partial class MainWindow
 {
     private readonly LcuService _lcu = new();
     private readonly BuildProvider _builds = new();
+    private readonly ItemSetService _itemSets;
     private readonly System.Timers.Timer _pollTimer = new(350);
 
     /// <summary>Name used for the rune page this app writes, so it never clobbers a user's own pages.</summary>
     private const string ManagedPageName = "Viktor Build";
 
+    /// <summary>Accent used for toggles, buttons and focus states, to match the card palette.</summary>
+    private static readonly Color AccentColor = Color.FromRgb(0x9F, 0x7A, 0xEA);
+
     private readonly SemaphoreSlim _pollGate = new(1, 1);
 
     private int _lastChampionId;
-    private Lane? _lastLane;
+    private Lane? _lastAssignedLane;
     private ChampionBuildData? _current;
     private List<RunePageViewModel> _pageViewModels = new();
     private RunePageViewModel? _selected;
 
     private bool _filtersReady;
-
-    /// <summary>Accent used for toggles, buttons and focus states, to match the card palette.</summary>
-    private static readonly System.Windows.Media.Color AccentColor =
-        System.Windows.Media.Color.FromRgb(0x9F, 0x7A, 0xEA);
+    private bool _inChampSelect;
+    private bool _gameWasRunning;
 
     public MainWindow()
     {
@@ -44,7 +47,25 @@ public partial class MainWindow
         ApplicationAccentColorManager.Apply(AccentColor, ApplicationTheme.Dark, false, false);
         ApplicationThemeManager.Apply(this);
 
+        _itemSets = new ItemSetService(_lcu);
+
         PopulateFilters();
+        UpdateIdleChips();
+
+        AutoAcceptToggle.Checked += (_, _) => UpdateIdleChips();
+        AutoAcceptToggle.Unchecked += (_, _) => UpdateIdleChips();
+        AutoApplyToggle.Checked += (_, _) => UpdateIdleChips();
+        AutoApplyToggle.Unchecked += (_, _) => UpdateIdleChips();
+        ItemSetToggle.Checked += (_, _) => UpdateIdleChips();
+        ItemSetToggle.Unchecked += (_, _) => OnItemSetsDisabled();
+
+        // Best effort on quit, so closing mid-game doesn't leave an item set behind.
+        // Run off the UI thread and time-box it: awaiting here would deadlock on Wait().
+        Closing += (_, _) =>
+        {
+            try { Task.Run(() => _itemSets.ClearAsync()).Wait(TimeSpan.FromSeconds(2)); }
+            catch { }
+        };
 
         _pollTimer.Elapsed += async (_, _) => await PollLeagueClient();
         _pollTimer.Start();
@@ -52,6 +73,11 @@ public partial class MainWindow
 
     private void PopulateFilters()
     {
+        // "Auto" is first so the default keeps the previous behaviour.
+        LaneCombo.Items.Add(new ComboBoxItem { Content = "Auto", Tag = null });
+        foreach (var lane in new[] { Lane.Top, Lane.Jungle, Lane.Mid, Lane.Bottom, Lane.Support })
+            LaneCombo.Items.Add(new ComboBoxItem { Content = StatsCatalog.LaneLabel(lane), Tag = lane });
+
         foreach (var rank in new[]
                  {
                      StatsRank.PlatinumPlus, StatsRank.EmeraldPlus, StatsRank.DiamondPlus,
@@ -71,6 +97,7 @@ public partial class MainWindow
             RegionCombo.Items.Add(new ComboBoxItem { Content = StatsCatalog.RegionLabel(region), Tag = region });
         }
 
+        LaneCombo.SelectedIndex = 0;   // Auto
         RankCombo.SelectedIndex = 2;   // Diamond+
         RegionCombo.SelectedIndex = 0; // World
         _filtersReady = true;
@@ -81,6 +108,10 @@ public partial class MainWindow
 
     private StatsRegion SelectedRegion =>
         (RegionCombo.SelectedItem as ComboBoxItem)?.Tag is StatsRegion r ? r : StatsRegion.World;
+
+    /// <summary>The lane the user forced, or null when the dropdown is on "Auto".</summary>
+    private Lane? SelectedLaneOverride =>
+        (LaneCombo.SelectedItem as ComboBoxItem)?.Tag is Lane l ? l : null;
 
     // ---- Polling ----
 
@@ -95,14 +126,15 @@ public partial class MainWindow
             {
                 if (!await _lcu.TryConnectAsync())
                 {
-                    Dispatcher.Invoke(() => StatusText.Text = "Searching for League Client...");
+                    Dispatcher.Invoke(() => SetStatus("Searching for League Client...", false));
                     return;
                 }
             }
 
-            Dispatcher.Invoke(() => StatusText.Text = "Connected to League Client");
+            Dispatcher.Invoke(() => SetStatus("Connected to League Client", true));
 
             await HandleAutoAcceptAsync();
+            await HandleGameflowAsync();
             await HandleChampSelectAsync();
         }
         catch { }
@@ -132,35 +164,63 @@ public partial class MainWindow
         catch { }
     }
 
+    /// <summary>
+    /// Watches the game phase so an imported item set is removed once the game is over,
+    /// rather than piling up in the player's shop.
+    /// </summary>
+    private async Task HandleGameflowAsync()
+    {
+        string? phase = await _lcu.GetAsync("lol-gameflow/v1/gameflow-phase");
+        if (string.IsNullOrEmpty(phase)) return;
+
+        phase = phase.Trim('"');
+
+        if (phase == "InProgress")
+        {
+            _gameWasRunning = true;
+            return;
+        }
+
+        if (!_gameWasRunning) return;
+
+        // The game just ended: take back whatever we added to the shop.
+        _gameWasRunning = false;
+        await _itemSets.ClearAsync();
+        Dispatcher.Invoke(() => SettingsStatus.Text = "Item set removed after the game.");
+    }
+
     private async Task HandleChampSelectAsync()
     {
         string? session = await _lcu.GetAsync("lol-champ-select/v1/session");
 
         if (string.IsNullOrEmpty(session))
         {
-            if (_lastChampionId != 0)
+            if (_lastChampionId != 0 || _inChampSelect)
             {
                 _lastChampionId = 0;
-                _lastLane = null;
+                _lastAssignedLane = null;
+                _inChampSelect = false;
                 Dispatcher.Invoke(ClearDisplay);
             }
             return;
         }
 
-        var (championId, isLocked, lane) = ParseChampSelect(session);
+        _inChampSelect = true;
+
+        var (championId, isLocked, assignedLane) = ParseChampSelect(session);
         if (championId <= 0) return;
 
         // Refetch when the champion changes, or when the assigned role resolves later.
-        if (championId == _lastChampionId && lane == _lastLane)
+        if (championId == _lastChampionId && assignedLane == _lastAssignedLane)
         {
             Dispatcher.Invoke(() => UpdateChampionHeader(championId, isLocked));
             return;
         }
 
         _lastChampionId = championId;
-        _lastLane = lane;
+        _lastAssignedLane = assignedLane;
 
-        await LoadBuildAsync(championId, isLocked, lane);
+        await LoadBuildAsync(championId, isLocked, assignedLane);
     }
 
     private (int ChampionId, bool IsLocked, Lane? Lane) ParseChampSelect(string session)
@@ -223,7 +283,19 @@ public partial class MainWindow
         }
     }
 
-    private async Task LoadBuildAsync(int championId, bool isLocked, Lane? lane)
+    /// <summary>
+    /// Resolves which lane to build for. A manual override always wins; otherwise champ
+    /// select's assigned position is used, and failing that op.gg picks the most-played lane.
+    /// </summary>
+    private (Lane? Lane, LaneSource Source) ResolveLane(Lane? assignedLane)
+    {
+        var manual = Dispatcher.Invoke(() => SelectedLaneOverride);
+        if (manual.HasValue) return (manual, LaneSource.Manual);
+        if (assignedLane.HasValue) return (assignedLane, LaneSource.Assigned);
+        return (null, LaneSource.Detected);
+    }
+
+    private async Task LoadBuildAsync(int championId, bool isLocked, Lane? assignedLane)
     {
         string name = _lcu.ChampionData.TryGetValue(championId, out var d) ? d.Name : $"Champion #{championId}";
         string alias = _lcu.ChampionData.TryGetValue(championId, out var d2) ? d2.Key : name;
@@ -231,15 +303,21 @@ public partial class MainWindow
         Dispatcher.Invoke(() =>
         {
             UpdateChampionHeader(championId, isLocked);
-            StatusText.Text = $"Loading {name} builds...";
+            SetStatus($"Loading {name} builds...", true);
         });
 
         var rank = Dispatcher.Invoke(() => SelectedRank);
         var region = Dispatcher.Invoke(() => SelectedRegion);
+        var (lane, laneSource) = ResolveLane(assignedLane);
 
-        var data = await _builds.GetBuildAsync(_lcu, championId, name, alias, lane, rank, region);
+        var data = await _builds.GetBuildAsync(_lcu, championId, name, alias, lane, laneSource, rank, region);
 
         // The user may have hovered a different champion while this was in flight.
+        if (championId != _lastChampionId) return;
+
+        // Fetch icons before building the cards so they render complete.
+        await IconCache.PreloadAsync(data.Pages.SelectMany(p => RunePageViewModel.IconPathsFor(_lcu, p)));
+
         if (championId != _lastChampionId) return;
 
         _current = data;
@@ -247,7 +325,7 @@ public partial class MainWindow
         Dispatcher.Invoke(() =>
         {
             RenderBuild(data, isLocked);
-            StatusText.Text = "Connected to League Client";
+            SetStatus("Connected to League Client", true);
         });
 
         bool autoApply = Dispatcher.Invoke(() => AutoApplyToggle.IsChecked ?? false);
@@ -256,6 +334,14 @@ public partial class MainWindow
     }
 
     // ---- Rendering ----
+
+    private void SetStatus(string text, bool connected)
+    {
+        StatusText.Text = text;
+        ConnDot.Fill = connected
+            ? (Brush)FindResource("Mint")
+            : (Brush)FindResource("TextLo");
+    }
 
     private void UpdateChampionHeader(int championId, bool isLocked)
     {
@@ -270,10 +356,22 @@ public partial class MainWindow
         RoleBadge.Text = StatsCatalog.LaneLabel(data.Lane);
         PatchBadge.Text = string.IsNullOrEmpty(data.Patch) ? "" : $"Patch {data.Patch}";
 
+        string laneNote = data.LaneSource switch
+        {
+            LaneSource.Manual => "role set manually",
+            LaneSource.Assigned => "role from champ select",
+            _ => "role guessed from play rate — set it above if wrong"
+        };
+
         string filters = $"{StatsCatalog.RankLabel(data.Rank)} · {StatsCatalog.RegionLabel(data.Region)}";
         SourceLine.Text = string.IsNullOrEmpty(data.StatusLine)
-            ? filters
-            : $"{filters} · {data.StatusLine}";
+            ? $"{filters} · {laneNote}"
+            : $"{filters} · {data.StatusLine} · {laneNote}";
+
+        // Warn when the role was a guess, since builds differ wildly by role.
+        SourceLine.Foreground = data.LaneSource == LaneSource.Detected
+            ? (Brush)FindResource("Amber")
+            : (Brush)FindResource("TextLo");
 
         _pageViewModels = data.Pages
             .Select((p, i) => new RunePageViewModel(_lcu, p, i))
@@ -282,9 +380,17 @@ public partial class MainWindow
         PagesList.ItemsSource = _pageViewModels;
         _selected = _pageViewModels.FirstOrDefault();
 
-        EmptyHint.Visibility = _pageViewModels.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        if (_pageViewModels.Count == 0)
-            EmptyHint.Text = $"No build data found for {data.ChampionName} at this rank/region.";
+        bool hasPages = _pageViewModels.Count > 0;
+        IdlePanel.Visibility = hasPages ? Visibility.Collapsed : Visibility.Visible;
+        ImportBtn.Visibility = hasPages ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!hasPages)
+        {
+            IdleTitle.Text = $"No data for {data.ChampionName}";
+            IdleSubtitle.Text = "Try a different role, rank or region.";
+        }
+
+        HintText.Text = hasPages ? "Click a card to apply that rune page" : "";
     }
 
     private void ClearDisplay()
@@ -294,12 +400,37 @@ public partial class MainWindow
         _selected = null;
 
         PagesList.ItemsSource = null;
-        ChampNameText.Text = "In Lobby / In Game";
+        ChampNameText.Text = "None (hover a champion)";
         RoleBadge.Text = "—";
         PatchBadge.Text = "";
         SourceLine.Text = "";
-        EmptyHint.Visibility = Visibility.Visible;
-        EmptyHint.Text = "Standby for champion select...";
+        SourceLine.Foreground = (Brush)FindResource("TextLo");
+
+        IdlePanel.Visibility = Visibility.Visible;
+        IdleTitle.Text = "Waiting for champion select";
+        IdleSubtitle.Text = "Hover or lock a champion and your builds appear here.";
+        ImportBtn.Visibility = Visibility.Collapsed;
+        HintText.Text = "";
+
+        UpdateIdleChips();
+    }
+
+    /// <summary>Shows which options are on, so the idle screen says something useful.</summary>
+    private void UpdateIdleChips()
+    {
+        var chips = new List<string>();
+        if (AutoAcceptToggle.IsChecked == true) chips.Add("Auto-accept queue");
+        if (AutoApplyToggle.IsChecked == true) chips.Add("Auto-apply runes");
+        if (ItemSetToggle.IsChecked == true) chips.Add("Item set import");
+        if (chips.Count == 0) chips.Add("All automation off");
+
+        IdleChips.ItemsSource = chips;
+    }
+
+    private async void OnItemSetsDisabled()
+    {
+        UpdateIdleChips();
+        await _itemSets.ClearAsync();
     }
 
     // ---- Applying runes ----
@@ -340,15 +471,28 @@ public partial class MainWindow
                 foreach (var other in _pageViewModels) other.IsApplied = false;
                 vm.IsApplied = true;
                 _selected = vm;
-                StatusText.Text = $"Applied: {vm.Label} — {vm.KeystoneName}";
+                SetStatus($"Applied: {vm.Label} — {vm.KeystoneName}", true);
             });
+
+            await MaybeImportItemSetAsync(vm);
         }
         else
         {
-            Dispatcher.Invoke(() => StatusText.Text = "Could not write rune page (all pages may be in use)");
+            Dispatcher.Invoke(() => SetStatus("Could not write rune page (all pages may be in use)", true));
         }
 
         return ok;
+    }
+
+    private async Task MaybeImportItemSetAsync(RunePageViewModel vm)
+    {
+        bool enabled = Dispatcher.Invoke(() => ItemSetToggle.IsChecked ?? false);
+        if (!enabled || _current == null) return;
+
+        bool ok = await _itemSets.ApplyAsync(_lcu, _current, vm.Page);
+        Dispatcher.Invoke(() => SettingsStatus.Text = ok
+            ? $"Item set imported for {_current.ChampionName}."
+            : "Could not import the item set.");
     }
 
     private async Task DeleteManagedPagesAsync()
@@ -412,11 +556,13 @@ public partial class MainWindow
         if (target != null) await ApplyPageAsync(target);
     }
 
+    private void SettingsBtn_Click(object sender, RoutedEventArgs e) =>
+        SettingsPopup.IsOpen = !SettingsPopup.IsOpen;
+
     private async void Filter_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_filtersReady || _current == null) return;
 
-        int championId = _current.ChampionId;
-        await LoadBuildAsync(championId, true, _lastLane);
+        await LoadBuildAsync(_current.ChampionId, true, _lastAssignedLane);
     }
 }

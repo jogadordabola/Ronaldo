@@ -12,9 +12,6 @@ public class ItemBuild
     public List<int> SituationalIds { get; set; } = new();
     public List<int> SpellIds { get; set; } = new();
 
-    public string SkillOrder { get; set; } = "";        // e.g. "Q > E > W"
-    public List<string> SkillSequence { get; set; } = new(); // per-level, e.g. Q W E Q Q R ...
-
     public double WinRate { get; set; }
     public int Games { get; set; }
 
@@ -51,12 +48,26 @@ public class RunePage
     public bool IsValid => PerkIds.Count == 9 && PrimaryStyleId > 0 && SubStyleId > 0;
 }
 
+/// <summary>Where the lane being shown came from, so the UI can say how sure it is.</summary>
+public enum LaneSource
+{
+    /// <summary>The user picked it from the lane dropdown.</summary>
+    Manual,
+
+    /// <summary>Champ select told us the assigned position.</summary>
+    Assigned,
+
+    /// <summary>No role was available, so the champion's most-played lane was used.</summary>
+    Detected
+}
+
 /// <summary>Everything the UI shows for one champion at one lane/rank/region.</summary>
 public class ChampionBuildData
 {
     public int ChampionId { get; set; }
     public string ChampionName { get; set; } = "";
     public Lane Lane { get; set; } = Lane.Mid;
+    public LaneSource LaneSource { get; set; } = LaneSource.Detected;
     public StatsRank Rank { get; set; } = StatsRank.DiamondPlus;
     public StatsRegion Region { get; set; } = StatsRegion.World;
     public string Patch { get; set; } = "";

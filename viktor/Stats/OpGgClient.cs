@@ -44,8 +44,6 @@ public class OpGgChampion
     public List<OpGgOption> Boots { get; set; } = new();
     public List<OpGgOption> LastItems { get; set; } = new();
     public List<OpGgOption> SummonerSpells { get; set; } = new();
-    public List<OpGgOption> SkillOrders { get; set; } = new();
-    public List<OpGgOption> SkillMasteries { get; set; } = new();
 
     /// <summary>Share of this champion's games played in each lane, from summary.positions.</summary>
     public Dictionary<Lane, double> LaneRates { get; set; } = new();
@@ -84,9 +82,7 @@ public class OpGgClient
                 StarterItems = ReadOptions(data, "starter_items"),
                 Boots = ReadOptions(data, "boots"),
                 LastItems = ReadOptions(data, "last_items"),
-                SummonerSpells = ReadOptions(data, "summoner_spells"),
-                SkillOrders = ReadSkillOrders(data),
-                SkillMasteries = ReadOptions(data, "skill_masteries")
+                SummonerSpells = ReadOptions(data, "summoner_spells")
             };
 
             ReadPositions(data, champ);
@@ -157,35 +153,6 @@ public class OpGgClient
             }
 
             if (option.Ids.Count > 0 || option.Labels.Count > 0) options.Add(option);
-        }
-
-        return options.OrderByDescending(o => o.Play).ToList();
-    }
-
-    /// <summary>skills[] holds the per-level order as letters rather than an "ids" array.</summary>
-    private static List<OpGgOption> ReadSkillOrders(JsonElement data)
-    {
-        var options = new List<OpGgOption>();
-        if (!data.TryGetProperty("skills", out var arr) || arr.ValueKind != JsonValueKind.Array)
-            return options;
-
-        foreach (var e in arr.EnumerateArray())
-        {
-            var option = new OpGgOption
-            {
-                Play = GetInt(e, "play"),
-                Win = GetInt(e, "win"),
-                PickRate = GetDouble(e, "pick_rate")
-            };
-
-            if (e.TryGetProperty("order", out var order) && order.ValueKind == JsonValueKind.Array)
-                foreach (var x in order.EnumerateArray())
-                {
-                    string s = x.GetString() ?? "";
-                    if (s.Length > 0) option.Labels.Add(s);
-                }
-
-            if (option.Labels.Count > 0) options.Add(option);
         }
 
         return options.OrderByDescending(o => o.Play).ToList();

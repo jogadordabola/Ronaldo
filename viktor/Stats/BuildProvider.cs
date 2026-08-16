@@ -24,9 +24,13 @@ public class BuildProvider
 
     private const int MaxPages = 3;
 
+    /// <param name="assignedLane">
+    /// The lane to build for, or null to let op.gg's play rates decide. A non-null lane is
+    /// always honoured, so a manual override is never second-guessed by the auto-detection.
+    /// </param>
     public async Task<ChampionBuildData> GetBuildAsync(
         LcuService lcu, int championId, string championName, string alias,
-        Lane? assignedLane, StatsRank rank, StatsRegion region,
+        Lane? assignedLane, LaneSource laneSource, StatsRank rank, StatsRegion region,
         CancellationToken ct = default)
     {
         var data = new ChampionBuildData
@@ -35,7 +39,8 @@ public class BuildProvider
             ChampionName = championName,
             Rank = rank,
             Region = region,
-            Lane = assignedLane ?? Lane.Mid
+            Lane = assignedLane ?? Lane.Mid,
+            LaneSource = laneSource
         };
 
         // op.gg reports every position's play rate whichever one we ask for, so a single
@@ -45,6 +50,7 @@ public class BuildProvider
         if (opgg != null && assignedLane == null && opgg.BestLane.HasValue && opgg.BestLane != data.Lane)
         {
             data.Lane = opgg.BestLane.Value;
+            data.LaneSource = LaneSource.Detected;
             opgg = await _opgg.GetChampionAsync(championId, data.Lane, rank, region, ct) ?? opgg;
         }
 
@@ -152,12 +158,6 @@ public class BuildProvider
         var topStarter = opgg.StarterItems.FirstOrDefault();
         var topBoots = opgg.Boots.FirstOrDefault();
         var topSpells = opgg.SummonerSpells.FirstOrDefault();
-        var topSkills = opgg.SkillOrders.FirstOrDefault();
-        var topMastery = opgg.SkillMasteries.FirstOrDefault();
-
-        string skillOrder = topMastery != null && topMastery.Labels.Count > 0
-            ? string.Join(" ➔ ", topMastery.Labels)
-            : "";
 
         var situational = opgg.LastItems
             .SelectMany(o => o.Ids)
@@ -184,8 +184,6 @@ public class BuildProvider
         {
             var build = new ItemBuild
             {
-                SkillOrder = skillOrder,
-                SkillSequence = topSkills?.Labels ?? new List<string>(),
                 SpellIds = topSpells?.Ids ?? new List<int>(),
                 StarterIds = topStarter?.Ids ?? new List<int>(),
                 BootsId = topBoots?.Ids.FirstOrDefault() ?? 0
