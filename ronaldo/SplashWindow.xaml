@@ -50,17 +50,8 @@
                         </Ellipse.Triggers>
                     </Ellipse>
 
-                    <Border Width="74" Height="74" CornerRadius="21"
-                            HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Color="#B794F6" Offset="0"/>
-                                <GradientStop Color="#6D4AA8" Offset="1"/>
-                            </LinearGradientBrush>
-                        </Border.Background>
-                        <TextBlock Text="R" FontSize="42" FontWeight="Bold" Foreground="#17131F"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+                    <TextBlock Text="R" FontSize="60" FontWeight="Bold" Foreground="#C9B6F5"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Grid>
 
                 <TextBlock Text="RONALDO" FontSize="22" FontWeight="Bold"

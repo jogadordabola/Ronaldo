@@ -428,18 +428,9 @@
                             </Ellipse.Triggers>
                         </Ellipse>
 
-                        <Border Width="104" Height="104" CornerRadius="30"
-                                HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                    <GradientStop Color="#B794F6" Offset="0"/>
-                                    <GradientStop Color="#6D4AA8" Offset="1"/>
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <ui:TextBlock Text="R" FontSize="54" FontWeight="Bold"
-                                          Foreground="#17131F"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
+                        <ui:TextBlock Text="R" FontSize="76" FontWeight="Bold"
+                                      Foreground="{StaticResource VioletLt}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
 
                     <ui:TextBlock x:Name="IdleTitle" Text="Waiting for champion select"
