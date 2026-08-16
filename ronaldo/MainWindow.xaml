@@ -76,6 +76,170 @@
             <WrapPanel Orientation="Horizontal"/>
         </ItemsPanelTemplate>
 
+        <!-- One row of an expanded match scoreboard -->
+        <DataTemplate x:Key="ScoreboardRowTemplate">
+            <Border CornerRadius="6" Padding="8,5" Margin="0,0,0,4" BorderThickness="1">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="#1E1929"/>
+                        <Setter Property="BorderBrush" Value="Transparent"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsMe}" Value="True">
+                                <Setter Property="Background" Value="{StaticResource BgCardOn}"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource EdgeOn}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" CornerRadius="4" Width="30" Height="30"
+                            ClipToBounds="True" Background="#191324">
+                        <Image Source="{Binding ChampionIcon}" Width="30" Height="30"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Margin="8,0,6,0" VerticalAlignment="Center">
+                        <ui:TextBlock Text="{Binding Name}" FontTypography="Caption"
+                                      Foreground="{StaticResource TextHi}"
+                                      TextTrimming="CharacterEllipsis"/>
+                        <ui:TextBlock Text="{Binding ChampionName}" Style="{StaticResource Caption}"
+                                      TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Width="76">
+                        <ui:TextBlock Text="{Binding KdaText}" FontTypography="Caption"
+                                      Foreground="{StaticResource TextHi}"/>
+                        <ui:TextBlock Text="{Binding CsText}" Style="{StaticResource Caption}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" VerticalAlignment="Center" Width="70">
+                        <ui:TextBlock Text="{Binding DamageText}" Style="{StaticResource Caption}"
+                                      Foreground="{StaticResource Lilac}"/>
+                        <ui:TextBlock Text="{Binding LevelText}" Style="{StaticResource Caption}"/>
+                    </StackPanel>
+
+                    <ItemsControl Grid.Column="4" ItemsSource="{Binding Items}"
+                                  VerticalAlignment="Center"
+                                  ItemTemplate="{StaticResource SmallIconTemplate}"
+                                  ItemsPanel="{StaticResource RowPanel}" Width="196"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- A match in the history list; clicking it reveals the full scoreboard -->
+        <DataTemplate x:Key="MatchTemplate">
+            <Border CornerRadius="8" Padding="12,10" Margin="0,0,0,8" BorderThickness="1"
+                    Background="{StaticResource BgCard}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="BorderBrush" Value="{StaticResource Edge}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Won}" Value="True">
+                                <Setter Property="BorderBrush" Value="#2E6B55"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Won}" Value="False">
+                                <Setter Property="BorderBrush" Value="#6B3340"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <StackPanel>
+                    <Grid Cursor="Hand" Background="Transparent" MouseLeftButtonUp="Match_Click">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" CornerRadius="6" Width="44" Height="44"
+                                ClipToBounds="True" Background="#191324">
+                            <Image Source="{Binding ChampionIcon}" Width="44" Height="44"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Margin="10,0,14,0" VerticalAlignment="Center" Width="118">
+                            <ui:TextBlock Text="{Binding ResultText}" FontTypography="BodyStrong">
+                                <ui:TextBlock.Style>
+                                    <Style TargetType="ui:TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource Mint}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Won}" Value="False">
+                                                <Setter Property="Foreground" Value="#F0A0A8"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:TextBlock.Style>
+                            </ui:TextBlock>
+                            <ui:TextBlock Text="{Binding ChampionName}" Style="{StaticResource Caption}"
+                                          Foreground="{StaticResource Lilac}"/>
+                            <ui:TextBlock Text="{Binding QueueText}" Style="{StaticResource Caption}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Width="110">
+                            <ui:TextBlock Text="{Binding KdaText}" FontTypography="BodyStrong"
+                                          Foreground="{StaticResource TextHi}"/>
+                            <ui:TextBlock Text="{Binding RatioText}" Style="{StaticResource Caption}"/>
+                            <ui:TextBlock Text="{Binding CsText}" Style="{StaticResource Caption}"/>
+                        </StackPanel>
+
+                        <ItemsControl Grid.Column="3" ItemsSource="{Binding Items}"
+                                      VerticalAlignment="Center" HorizontalAlignment="Left"
+                                      ItemTemplate="{StaticResource SmallIconTemplate}"
+                                      ItemsPanel="{StaticResource RowPanel}" MaxWidth="230"/>
+
+                        <StackPanel Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <ui:TextBlock Text="{Binding DurationText}" Style="{StaticResource Caption}"
+                                          HorizontalAlignment="Right"/>
+                            <ui:TextBlock Text="{Binding WhenText}" Style="{StaticResource Caption}"
+                                          HorizontalAlignment="Right"/>
+                            <ui:TextBlock Text="{Binding ExpandHint}" Style="{StaticResource Caption}"
+                                          Foreground="{StaticResource Violet}" HorizontalAlignment="Right"
+                                          Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Full end-of-game scoreboard -->
+                    <StackPanel Margin="0,12,0,0"
+                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
+                        <Border Height="1" Background="{StaticResource Divider}" Margin="0,0,0,10"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <ui:TextBlock Text="BLUE TEAM" Style="{StaticResource Caption}"
+                                              Foreground="{StaticResource Periwinkle}" Margin="0,0,0,6"/>
+                                <ItemsControl ItemsSource="{Binding BlueTeam}"
+                                              ItemTemplate="{StaticResource ScoreboardRowTemplate}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <ui:TextBlock Text="RED TEAM" Style="{StaticResource Caption}"
+                                              Foreground="{StaticResource Lilac}" Margin="0,0,0,6"/>
+                                <ItemsControl ItemsSource="{Binding RedTeam}"
+                                              ItemTemplate="{StaticResource ScoreboardRowTemplate}"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <!-- One player in the live game, laid out like the loading screen -->
         <DataTemplate x:Key="LivePlayerTemplate">
             <Border Margin="5" CornerRadius="8" Padding="10,9" Width="212"
@@ -336,6 +500,14 @@
                             <ui:SymbolIcon Symbol="Settings24" FontSize="16"
                                            Foreground="{StaticResource TextLo}"/>
                         </Button>
+
+                        <Button x:Name="ProfileBtn" Click="ProfileBtn_Click"
+                                Width="30" Height="26" Margin="2,0,0,0"
+                                Padding="0" Background="Transparent" BorderThickness="0"
+                                Cursor="Hand" VerticalAlignment="Center" ToolTip="Your profile">
+                            <ui:SymbolIcon Symbol="Person24" FontSize="16"
+                                           Foreground="{StaticResource TextLo}"/>
+                        </Button>
                     </StackPanel>
                 </ui:TitleBar.Header>
             </ui:TitleBar>
@@ -436,6 +608,93 @@
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </ScrollViewer>
+
+            <!-- Profile: rank, record and match history.
+                 Sits above the other panels so it can overlay whatever is on screen. -->
+            <Grid x:Name="ProfilePanel" Visibility="Collapsed" Panel.ZIndex="10"
+                  Background="{StaticResource BgWindow}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="{StaticResource BgPanel}" CornerRadius="10"
+                        BorderBrush="{StaticResource Edge}" BorderThickness="1"
+                        Margin="6,0,6,10" Padding="18,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" CornerRadius="28" Width="56" Height="56"
+                                ClipToBounds="True" Background="#191324">
+                            <Image x:Name="ProfileIcon" Width="56" Height="56"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                            <ui:TextBlock x:Name="ProfileName" Text="—" FontTypography="Title"
+                                          Foreground="{StaticResource VioletLt}"/>
+                            <ui:TextBlock x:Name="ProfileLevel" Text="" Style="{StaticResource Caption}"
+                                          Margin="0,2,0,0"/>
+
+                            <ItemsControl x:Name="RankList" Margin="0,10,0,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource BgInset}" CornerRadius="8"
+                                                Padding="12,8" Margin="0,0,10,0" MinWidth="180">
+                                            <StackPanel>
+                                                <ui:TextBlock Text="{Binding QueueName}"
+                                                              Style="{StaticResource Caption}"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                                    <ui:TextBlock Text="{Binding TierText}"
+                                                                  FontTypography="BodyStrong"
+                                                                  Foreground="{StaticResource TextHi}"/>
+                                                    <ui:TextBlock Text="{Binding LpText}"
+                                                                  FontTypography="Caption"
+                                                                  Foreground="{StaticResource VioletLt}"
+                                                                  VerticalAlignment="Center"
+                                                                  Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                                <ui:TextBlock Text="{Binding RecordText}"
+                                                              Style="{StaticResource Caption}"
+                                                              Foreground="{StaticResource Mint}"/>
+                                                <ui:TextBlock Text="{Binding WinRateText}"
+                                                              Style="{StaticResource Caption}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <ui:Button Grid.Column="2" Content="Close" Click="ProfileClose_Click"
+                                   VerticalAlignment="Top" MinWidth="90"/>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="1" Margin="6,0,6,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <ui:TextBlock Text="MATCH HISTORY" Style="{StaticResource Caption}"
+                                          Foreground="{StaticResource VioletLt}" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="MatchList" ItemTemplate="{StaticResource MatchTemplate}"/>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <ui:TextBlock x:Name="ProfileHint" Text="Loading profile..."
+                                  FontTypography="Body" Foreground="{StaticResource TextLo}"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  TextWrapping="Wrap" MaxWidth="620" TextAlignment="Center"/>
+                </Grid>
+            </Grid>
 
             <!-- In-game scoreboard -->
             <Grid x:Name="InGamePanel" Visibility="Collapsed">

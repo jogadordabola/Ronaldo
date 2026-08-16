@@ -20,6 +20,7 @@ public partial class MainWindow
     private readonly BuildProvider _builds = new();
     private readonly ItemSetService _itemSets;
     private readonly GameSessionService _gameSession;
+    private readonly ProfileService _profile;
     private readonly System.Timers.Timer _pollTimer = new(350);
 
     /// <summary>Name used for the rune page this app writes, so it never clobbers a user's own pages.</summary>
@@ -59,6 +60,7 @@ public partial class MainWindow
         _settings = settings;
         _itemSets = new ItemSetService(_lcu);
         _gameSession = new GameSessionService(_lcu);
+        _profile = new ProfileService(_lcu);
 
         WindowPlacement.Restore(this, settings);
 
@@ -721,6 +723,88 @@ public partial class MainWindow
 
     private void SettingsBtn_Click(object sender, RoutedEventArgs e) =>
         SettingsPopup.IsOpen = !SettingsPopup.IsOpen;
+
+    // ---- Profile ----
+
+    private async void ProfileBtn_Click(object sender, RoutedEventArgs e)
+    {
+        // Toggle: a second click closes it again.
+        if (ProfilePanel.Visibility == Visibility.Visible)
+        {
+            CloseProfile();
+            return;
+        }
+
+        ProfilePanel.Visibility = Visibility.Visible;
+        ProfileHint.Visibility = Visibility.Visible;
+
+        if (!_lcu.IsConnected)
+        {
+            ProfileName.Text = "Not connected";
+            ProfileLevel.Text = "";
+            ProfileHint.Text = "Waiting for the League client...";
+            return;
+        }
+
+        ProfileHint.Text = "Loading profile...";
+
+        await LoadProfileAsync();
+    }
+
+    private void ProfileClose_Click(object sender, RoutedEventArgs e) => CloseProfile();
+
+    private void CloseProfile() => ProfilePanel.Visibility = Visibility.Collapsed;
+
+    private async Task LoadProfileAsync()
+    {
+        if (!_lcu.IsConnected) return;
+
+        var summoner = await _profile.GetSummonerAsync();
+        if (summoner == null)
+        {
+            Dispatcher.Invoke(() => ProfileHint.Text = "Could not read your profile from the client.");
+            return;
+        }
+
+        var ranks = await _profile.GetRanksAsync();
+        var matches = await _profile.GetMatchHistoryAsync(summoner.Puuid);
+
+        // Champion and item icons for every match, so the list renders in one go.
+        await IconCache.PreloadAsync(
+            matches.SelectMany(m => MatchViewModel.IconPathsFor(_lcu, m))
+                   .Append(ProfileIconPath(summoner.ProfileIconId)));
+
+        Dispatcher.Invoke(() =>
+        {
+            ProfileName.Text = summoner.Name.Length > 0 ? summoner.Name : "Unknown summoner";
+            ProfileLevel.Text = summoner.Level > 0 ? $"Level {summoner.Level}" : "";
+            ProfileIcon.Source = IconCache.Get(ProfileIconPath(summoner.ProfileIconId));
+
+            RankList.ItemsSource = ranks.Select(r => new RankEntryViewModel(r)).ToList();
+            MatchList.ItemsSource = matches.Select(m => new MatchViewModel(_lcu, m)).ToList();
+
+            if (matches.Count > 0)
+            {
+                ProfileHint.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                ProfileHint.Visibility = Visibility.Visible;
+                ProfileHint.Text = "No match history came back from the client. " +
+                                   "It only serves recent games, and none were returned.";
+            }
+        });
+    }
+
+    private static string ProfileIconPath(int iconId) =>
+        $"/lol-game-data/assets/v1/profile-icons/{iconId}.jpg";
+
+    /// <summary>Expands or collapses a match to reveal its end-of-game scoreboard.</summary>
+    private void Match_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is MatchViewModel vm)
+            vm.IsExpanded = !vm.IsExpanded;
+    }
 
     private async void Filter_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
