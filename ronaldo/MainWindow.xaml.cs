@@ -827,10 +827,14 @@ public partial class MainWindow
             foreach (var m in matches.Where(m => m.IsRanked))
                 m.LpDelta = _lpTracker.GetDelta(m.GameId);
 
-        // Champion and item icons for every match, so the list renders in one go.
+        var champions = ProfileService.SummariseChampions(matches);
+
+        // Match icons, the profile picture and the rank emblems, all before rendering.
         await IconCache.PreloadAsync(
             matches.SelectMany(m => MatchViewModel.IconPathsFor(_lcu, m))
-                   .Append(ProfileIconPath(summoner.ProfileIconId)));
+                   .Append(ProfileIconPath(summoner.ProfileIconId))
+                   .Concat(ranks.Select(r => r.EmblemUrl))
+                   .Concat(champions.Select(c => LivePlayerViewModel.ChampionIconPath(c.ChampionId))));
 
         string viewedPuuid = summoner.Puuid;
         int matchCount = matches.Count;
@@ -847,6 +851,15 @@ public partial class MainWindow
             ProfileIcon.Source = IconCache.Get(ProfileIconPath(summoner.ProfileIconId));
 
             RankList.ItemsSource = ranks.Select(r => new RankEntryViewModel(r)).ToList();
+
+            ChampionList.ItemsSource = champions
+                .Select(c => new ChampionStatViewModel(_lcu, c)).ToList();
+
+            // Be explicit that this is a form guide over recent games, not a career total.
+            ChampionsNote.Text = matchCount > 0
+                ? $"Across the last {matchCount} games"
+                : "No games to summarise";
+
             MatchList.ItemsSource = matches
                 .Select(m => new MatchViewModel(_lcu, m,
                     gameId => _profile.GetMatchDetailAsync(gameId, viewedPuuid)))

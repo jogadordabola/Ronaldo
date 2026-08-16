@@ -30,6 +30,26 @@ public class RankEntry
     public bool IsRanked => Tier.Length > 0 && !Tier.Equals("NONE", StringComparison.OrdinalIgnoreCase);
     public int Games => Wins + Losses;
     public double WinRate => Games > 0 ? Wins * 100.0 / Games : 0;
+
+    /// <summary>
+    /// Rank crest. These live outside the game-data plugin, so it's a full URL.
+    /// The shared-components set is used rather than ranked-emblem: the latter draws the crest
+    /// small on a 1280x720 canvas, which shrinks to nothing at UI size.
+    /// </summary>
+    public string EmblemUrl =>
+        "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-shared-components/global/default/" +
+        (IsRanked ? Tier.ToLowerInvariant() : "unranked") + ".png";
+}
+
+/// <summary>How a champion has performed across the games we could read.</summary>
+public class ChampionStat
+{
+    public int ChampionId { get; set; }
+    public int Wins { get; set; }
+    public int Losses { get; set; }
+
+    public int Games => Wins + Losses;
+    public double WinRate => Games > 0 ? Wins * 100.0 / Games : 0;
 }
 
 /// <summary>One player's final line in a finished game.</summary>
@@ -178,7 +198,8 @@ public class ProfileService
     /// Recent games. The history payload already carries every participant, so each match
     /// arrives with its full scoreboard and no follow-up request is needed.
     /// </summary>
-    public Task<List<MatchSummary>> GetMatchHistoryAsync(string puuid, int count = 15) =>
+    /// <summary>20 games: one request either way, and a big enough sample for the champion box.</summary>
+    public Task<List<MatchSummary>> GetMatchHistoryAsync(string puuid, int count = 20) =>
         ReadHistoryAsync(
             $"lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex={count - 1}",
             puuid);
@@ -189,7 +210,7 @@ public class ProfileService
     /// Returns an empty list — not an error — when the client declines to answer.
     /// </summary>
     public async Task<List<MatchSummary>> GetMatchHistoryForPuuidAsync(
-        string puuid, long accountId, int count = 15)
+        string puuid, long accountId, int count = 20)
     {
         var probe = new List<string>();
 
@@ -215,6 +236,27 @@ public class ProfileService
 
         SaveProbe(probe);
         return new List<MatchSummary>();
+    }
+
+    /// <summary>
+    /// Most-played champions across the fetched games. The client only serves recent matches,
+    /// so this is a form guide over that window rather than a career total.
+    /// </summary>
+    public static List<ChampionStat> SummariseChampions(IEnumerable<MatchSummary> matches, int take = 5)
+    {
+        return matches
+            .Where(m => m.ChampionId > 0)
+            .GroupBy(m => m.ChampionId)
+            .Select(g => new ChampionStat
+            {
+                ChampionId = g.Key,
+                Wins = g.Count(m => m.Won),
+                Losses = g.Count(m => !m.Won)
+            })
+            .OrderByDescending(c => c.Games)
+            .ThenByDescending(c => c.WinRate)
+            .Take(take)
+            .ToList();
     }
 
     /// <summary>Where the tried endpoints are recorded when another player's history fails.</summary>

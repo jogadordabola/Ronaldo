@@ -10,11 +10,33 @@ using ronaldo.Stats;
 
 namespace ronaldo;
 
+/// <summary>A champion in the most-played box.</summary>
+public class ChampionStatViewModel
+{
+    public ChampionStatViewModel(LcuService lcu, ChampionStat stat)
+    {
+        Icon = IconCache.Get(LivePlayerViewModel.ChampionIconPath(stat.ChampionId));
+        Name = lcu.ChampionData.TryGetValue(stat.ChampionId, out var c) ? c.Name : $"#{stat.ChampionId}";
+        RecordText = $"{stat.Wins}W {stat.Losses}L";
+        WinRateText = stat.WinRate.ToString("0", CultureInfo.InvariantCulture) + "%";
+        GamesText = stat.Games == 1 ? "1 game" : $"{stat.Games} games";
+        IsStrong = stat.WinRate >= 50;
+    }
+
+    public ImageSource? Icon { get; }
+    public string Name { get; }
+    public string RecordText { get; }
+    public string WinRateText { get; }
+    public string GamesText { get; }
+    public bool IsStrong { get; }
+}
+
 public class RankEntryViewModel
 {
     public RankEntryViewModel(RankEntry entry)
     {
         QueueName = entry.QueueName;
+        Emblem = IconCache.Get(entry.EmblemUrl);
 
         if (!entry.IsRanked)
         {
@@ -44,8 +66,10 @@ public class RankEntryViewModel
     public string LpText { get; } = "";
     public string RecordText { get; } = "";
     public string WinRateText { get; } = "";
+    public ImageSource? Emblem { get; }
 
     public bool HasLp => LpText.Length > 0;
+    public bool HasRecord => RecordText.Length > 0;
 }
 
 /// <summary>One player row inside an expanded match scoreboard.</summary>

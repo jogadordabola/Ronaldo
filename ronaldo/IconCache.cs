@@ -66,7 +66,7 @@ public static class IconCache
 
             if (bytes == null)
             {
-                string url = BaseUrl + key;
+                string url = IsAbsolute(key) ? key : BaseUrl + key;
                 try
                 {
                     using var res = await StatsHttp.Client.GetAsync(url);
@@ -116,17 +116,31 @@ public static class IconCache
     private static string Normalize(string iconPath)
     {
         string p = iconPath.Trim();
+
+        // Absolute URLs (rank emblems live outside the game-data plugin) pass through as-is.
+        if (p.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            p.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return p;
+
         if (p.StartsWith(PathPrefix, StringComparison.OrdinalIgnoreCase))
             p = p[PathPrefix.Length..];
         return p.TrimStart('/').ToLowerInvariant();
     }
+
+    private static bool IsAbsolute(string key) =>
+        key.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+        key.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
     private static string DiskPath(string key)
     {
         // Hash the key so nested asset paths become a flat, filesystem-safe cache.
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(key));
         string name = Convert.ToHexString(hash)[..24];
-        return Path.Combine(DiskDir, name + Path.GetExtension(key));
+
+        string ext = Path.GetExtension(key);
+        if (ext.Length is 0 or > 5) ext = ".png";
+
+        return Path.Combine(DiskDir, name + ext);
     }
 
     private static byte[]? ReadFromDisk(string key)
