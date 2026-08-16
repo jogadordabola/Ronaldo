@@ -1,0 +1,109 @@
+<Window x:Class="ronaldo.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Ronaldo" Height="300" Width="440"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None" ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True">
+
+    <Border CornerRadius="16" BorderThickness="1" BorderBrush="#3A3055">
+        <Border.Background>
+            <RadialGradientBrush GradientOrigin="0.5,0.35" Center="0.5,0.35" RadiusX="0.9" RadiusY="0.9">
+                <GradientStop Color="#241C3A" Offset="0"/>
+                <GradientStop Color="#14111B" Offset="1"/>
+            </RadialGradientBrush>
+        </Border.Background>
+
+        <Grid>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <!-- Badge with a soft pulse while loading -->
+                <Grid Width="140" Height="140" HorizontalAlignment="Center">
+                    <Ellipse x:Name="Glow" Width="140" Height="140" Opacity="0.35">
+                        <Ellipse.Fill>
+                            <RadialGradientBrush>
+                                <GradientStop Color="#00000000" Offset="0.5"/>
+                                <GradientStop Color="#9F7AEA" Offset="0.8"/>
+                                <GradientStop Color="#00000000" Offset="1"/>
+                            </RadialGradientBrush>
+                        </Ellipse.Fill>
+                        <Ellipse.RenderTransform>
+                            <ScaleTransform x:Name="GlowScale" CenterX="70" CenterY="70"/>
+                        </Ellipse.RenderTransform>
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetName="GlowScale"
+                                                         Storyboard.TargetProperty="ScaleX"
+                                                         From="0.88" To="1.1" Duration="0:0:1.1"/>
+                                        <DoubleAnimation Storyboard.TargetName="GlowScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         From="0.88" To="1.1" Duration="0:0:1.1"/>
+                                        <DoubleAnimation Storyboard.TargetName="Glow"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="0.25" To="0.6" Duration="0:0:1.1"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+
+                    <Border Width="74" Height="74" CornerRadius="21"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#B794F6" Offset="0"/>
+                                <GradientStop Color="#6D4AA8" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <TextBlock Text="R" FontSize="42" FontWeight="Bold" Foreground="#17131F"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </Grid>
+
+                <TextBlock Text="RONALDO" FontSize="22" FontWeight="Bold"
+                           HorizontalAlignment="Center" Margin="0,14,0,0">
+                    <TextBlock.Foreground>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#EDE4FF" Offset="0"/>
+                            <GradientStop Color="#A78BFA" Offset="1"/>
+                        </LinearGradientBrush>
+                    </TextBlock.Foreground>
+                </TextBlock>
+
+                <TextBlock x:Name="StatusLine" Text="Initializing..." FontSize="12"
+                           Foreground="#7C7496" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+
+                <!-- Indeterminate sweep so the wait reads as progress -->
+                <Border Width="200" Height="3" CornerRadius="2" Background="#241E36"
+                        Margin="0,18,0,0" ClipToBounds="True">
+                    <Border Width="70" Height="3" CornerRadius="2" HorizontalAlignment="Left">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="#00000000" Offset="0"/>
+                                <GradientStop Color="#B794F6" Offset="0.5"/>
+                                <GradientStop Color="#00000000" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="SweepShift"/>
+                        </Border.RenderTransform>
+                        <Border.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="SweepShift"
+                                                         Storyboard.TargetProperty="X"
+                                                         From="-70" To="200" Duration="0:0:1.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Border.Triggers>
+                    </Border>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

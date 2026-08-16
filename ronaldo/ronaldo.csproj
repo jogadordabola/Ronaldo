@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -6,10 +6,18 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\ronaldo.ico</ApplicationIcon>
+    <AssemblyTitle>Ronaldo</AssemblyTitle>
+    <Product>Ronaldo</Product>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Also embedded so the window and taskbar can use it at runtime. -->
+    <Resource Include="Assets\ronaldo.ico" />
   </ItemGroup>
 
 </Project>

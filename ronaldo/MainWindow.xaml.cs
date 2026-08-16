@@ -31,6 +31,7 @@ public partial class MainWindow
     private static readonly Color AccentColor = Color.FromRgb(0x9F, 0x7A, 0xEA);
 
     private readonly SemaphoreSlim _pollGate = new(1, 1);
+    private readonly AppSettings _settings;
 
     private int _lastChampionId;
     private Lane? _lastAssignedLane;
@@ -42,7 +43,9 @@ public partial class MainWindow
     private bool _inChampSelect;
     private bool _gameWasRunning;
 
-    public MainWindow()
+    public MainWindow() : this(AppSettings.Load()) { }
+
+    public MainWindow(AppSettings settings)
     {
         InitializeComponent();
 
@@ -50,22 +53,25 @@ public partial class MainWindow
         ApplicationAccentColorManager.Apply(AccentColor, ApplicationTheme.Dark, false, false);
         ApplicationThemeManager.Apply(this);
 
+        _settings = settings;
         _itemSets = new ItemSetService(_lcu);
 
         PopulateFilters();
+        ApplySettingsToControls();
         UpdateIdleChips();
 
-        AutoAcceptToggle.Checked += (_, _) => UpdateIdleChips();
-        AutoAcceptToggle.Unchecked += (_, _) => UpdateIdleChips();
-        AutoApplyToggle.Checked += (_, _) => UpdateIdleChips();
-        AutoApplyToggle.Unchecked += (_, _) => UpdateIdleChips();
-        ItemSetToggle.Checked += (_, _) => UpdateIdleChips();
+        AutoAcceptToggle.Checked += (_, _) => OnSettingChanged();
+        AutoAcceptToggle.Unchecked += (_, _) => OnSettingChanged();
+        AutoApplyToggle.Checked += (_, _) => OnSettingChanged();
+        AutoApplyToggle.Unchecked += (_, _) => OnSettingChanged();
+        ItemSetToggle.Checked += (_, _) => OnSettingChanged();
         ItemSetToggle.Unchecked += (_, _) => OnItemSetsDisabled();
 
         // Best effort on quit, so closing mid-game doesn't leave an item set behind.
         // Run off the UI thread and time-box it: awaiting here would deadlock on Wait().
         Closing += (_, _) =>
         {
+            SaveSettings();
             try { Task.Run(() => _itemSets.ClearAsync()).Wait(TimeSpan.FromSeconds(2)); }
             catch { }
         };
@@ -103,7 +109,51 @@ public partial class MainWindow
         LaneCombo.SelectedIndex = 0;   // Auto
         RankCombo.SelectedIndex = 2;   // Diamond+
         RegionCombo.SelectedIndex = 0; // World
+    }
+
+    /// <summary>Restores the saved toggles and filters, then arms change tracking.</summary>
+    private void ApplySettingsToControls()
+    {
+        AutoAcceptToggle.IsChecked = _settings.AutoAccept;
+        AutoApplyToggle.IsChecked = _settings.AutoApplyRunes;
+        ItemSetToggle.IsChecked = _settings.ImportItemSets;
+
+        SelectByTag(LaneCombo, _settings.Lane);
+        SelectByTag(RankCombo, _settings.Rank);
+        SelectByTag(RegionCombo, _settings.Region);
+
+        // Only now, so restoring selections doesn't trigger a build reload.
         _filtersReady = true;
+    }
+
+    private static void SelectByTag(ComboBox combo, object? tag)
+    {
+        foreach (ComboBoxItem item in combo.Items)
+        {
+            if (Equals(item.Tag, tag))
+            {
+                combo.SelectedItem = item;
+                return;
+            }
+        }
+    }
+
+    /// <summary>Captures the current control state and writes it to disk.</summary>
+    private void SaveSettings()
+    {
+        _settings.AutoAccept = AutoAcceptToggle.IsChecked ?? false;
+        _settings.AutoApplyRunes = AutoApplyToggle.IsChecked ?? false;
+        _settings.ImportItemSets = ItemSetToggle.IsChecked ?? false;
+        _settings.Lane = SelectedLaneOverride;
+        _settings.Rank = SelectedRank;
+        _settings.Region = SelectedRegion;
+        _settings.Save();
+    }
+
+    private void OnSettingChanged()
+    {
+        UpdateIdleChips();
+        SaveSettings();
     }
 
     private StatsRank SelectedRank =>
@@ -432,7 +482,7 @@ public partial class MainWindow
 
     private async void OnItemSetsDisabled()
     {
-        UpdateIdleChips();
+        OnSettingChanged();
         await _itemSets.ClearAsync();
     }
 
@@ -566,8 +616,11 @@ public partial class MainWindow
 
     private async void Filter_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_filtersReady || _current == null) return;
+        if (!_filtersReady) return;
 
+        SaveSettings();
+
+        if (_current == null) return;
         await LoadBuildAsync(_current.ChampionId, true, _lastAssignedLane);
     }
 }
