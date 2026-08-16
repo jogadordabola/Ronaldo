@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(curl -s -H 'User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) Chrome/131.0.0.0 Safari/537.36' 'https://a3.lolalytics.com/mega/?ep=build-itemset&v=1&c=ahri&patch=16.16&lane=middle&tier=diamond_plus&queue=420&region=all&keystone=8112')"
-    ]
-  }
-}

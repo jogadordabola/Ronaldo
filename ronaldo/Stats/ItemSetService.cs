@@ -18,9 +18,6 @@ public class ItemSetService
 {
     public const string TitlePrefix = "Ronaldo · ";
 
-    /// <summary>Sets written under the app's former name, still cleaned up so none are orphaned.</summary>
-    private const string LegacyTitlePrefix = "Viktor · ";
-
     private readonly LcuService _lcu;
     private long _summonerId;
 
@@ -99,8 +96,7 @@ public class ItemSetService
     {
         var ours = sets
             .Select((node, index) => (Title: node?["title"]?.GetValue<string>() ?? "", Index: index))
-            .Where(x => x.Title.StartsWith(TitlePrefix, StringComparison.Ordinal) ||
-                        x.Title.StartsWith(LegacyTitlePrefix, StringComparison.Ordinal))
+            .Where(x => x.Title.StartsWith(TitlePrefix, StringComparison.Ordinal))
             .Select(x => x.Index)
             .OrderByDescending(i => i)
             .ToList();
