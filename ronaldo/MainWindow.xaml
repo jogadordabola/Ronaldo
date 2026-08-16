@@ -200,6 +200,20 @@
                                       ItemsPanel="{StaticResource RowPanel}" MaxWidth="230"/>
 
                         <StackPanel Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <ui:TextBlock Text="{Binding LpText}" FontTypography="BodyStrong"
+                                          HorizontalAlignment="Right"
+                                          Visibility="{Binding HasLp, Converter={StaticResource BoolToVis}}">
+                                <ui:TextBlock.Style>
+                                    <Style TargetType="ui:TextBlock">
+                                        <Setter Property="Foreground" Value="#F0A0A8"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding LpGained}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource Mint}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:TextBlock.Style>
+                            </ui:TextBlock>
                             <ui:TextBlock Text="{Binding DurationText}" Style="{StaticResource Caption}"
                                           HorizontalAlignment="Right"/>
                             <ui:TextBlock Text="{Binding WhenText}" Style="{StaticResource Caption}"
@@ -214,6 +228,12 @@
                     <StackPanel Margin="0,12,0,0"
                                 Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
                         <Border Height="1" Background="{StaticResource Divider}" Margin="0,0,0,10"/>
+
+                        <ui:TextBlock Style="{StaticResource Caption}" Margin="0,0,0,8"
+                                      TextWrapping="Wrap"
+                                      Visibility="{Binding ScoreboardMissing, Converter={StaticResource BoolToVis}}"
+                                      Text="The client did not return the other players for this game."/>
+
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -491,13 +511,13 @@
                             </TextBlock.Foreground>
                         </TextBlock>
 
-                        <!-- Settings lives beside the wordmark: on the right it never lines up
+                        <!-- These live beside the wordmark: on the right they never line up
                              with the caption buttons, which sit higher and are a fixed size. -->
-                        <Button x:Name="SettingsBtn" Click="SettingsBtn_Click"
+                        <Button x:Name="HomeBtn" Click="HomeBtn_Click"
                                 Width="30" Height="26" Margin="14,0,0,0"
                                 Padding="0" Background="Transparent" BorderThickness="0"
-                                Cursor="Hand" VerticalAlignment="Center" ToolTip="Settings">
-                            <ui:SymbolIcon Symbol="Settings24" FontSize="16"
+                                Cursor="Hand" VerticalAlignment="Center" ToolTip="Home">
+                            <ui:SymbolIcon Symbol="Home24" FontSize="16"
                                            Foreground="{StaticResource TextLo}"/>
                         </Button>
 
@@ -506,6 +526,14 @@
                                 Padding="0" Background="Transparent" BorderThickness="0"
                                 Cursor="Hand" VerticalAlignment="Center" ToolTip="Your profile">
                             <ui:SymbolIcon Symbol="Person24" FontSize="16"
+                                           Foreground="{StaticResource TextLo}"/>
+                        </Button>
+
+                        <Button x:Name="SettingsBtn" Click="SettingsBtn_Click"
+                                Width="30" Height="26" Margin="2,0,0,0"
+                                Padding="0" Background="Transparent" BorderThickness="0"
+                                Cursor="Hand" VerticalAlignment="Center" ToolTip="Settings">
+                            <ui:SymbolIcon Symbol="Settings24" FontSize="16"
                                            Foreground="{StaticResource TextLo}"/>
                         </Button>
                     </StackPanel>
@@ -543,7 +571,7 @@
         </Grid>
 
         <!-- Top bar -->
-        <Border Grid.Row="1" Background="{StaticResource BgPanel}" CornerRadius="10"
+        <Border x:Name="TopBar" Grid.Row="1" Background="{StaticResource BgPanel}" CornerRadius="10"
                 BorderBrush="{StaticResource Edge}" BorderThickness="1" Margin="16,4,16,12"
                 Padding="18,14">
             <Grid>
@@ -675,8 +703,8 @@
                             </ItemsControl>
                         </StackPanel>
 
-                        <ui:Button Grid.Column="2" Content="Close" Click="ProfileClose_Click"
-                                   VerticalAlignment="Top" MinWidth="90"/>
+                        <ui:TextBlock Grid.Column="2" Text="Home returns to builds"
+                                      Style="{StaticResource Caption}" VerticalAlignment="Top"/>
                     </Grid>
                 </Border>
 

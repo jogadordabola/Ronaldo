@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows.Media;
 using ronaldo.Stats;
 
@@ -86,11 +87,18 @@ public class MatchViewModel : INotifyPropertyChanged
 {
     private readonly LcuService _lcu;
     private readonly MatchSummary _match;
+    private readonly Func<long, Task<List<ScoreboardPlayer>>>? _loadScoreboard;
 
-    public MatchViewModel(LcuService lcu, MatchSummary match)
+    /// <param name="loadScoreboard">
+    /// Fetches the full participant list on demand. The match-history list only carries the
+    /// signed-in player, so the scoreboard needs a per-game request the first time it opens.
+    /// </param>
+    public MatchViewModel(LcuService lcu, MatchSummary match,
+                          Func<long, Task<List<ScoreboardPlayer>>>? loadScoreboard = null)
     {
         _lcu = lcu;
         _match = match;
+        _loadScoreboard = loadScoreboard;
 
         ChampionIcon = IconCache.Get(LivePlayerViewModel.ChampionIconPath(match.ChampionId));
         ChampionName = lcu.ChampionData.TryGetValue(match.ChampionId, out var c) ? c.Name : "";
@@ -104,6 +112,9 @@ public class MatchViewModel : INotifyPropertyChanged
             ? $"{(int)match.Duration.TotalMinutes}m {match.Duration.Seconds}s"
             : $"{match.Duration.Seconds}s";
         WhenText = Ago(match.PlayedAt);
+
+        if (match.LpDelta is { } lp)
+            LpText = lp > 0 ? $"+{lp} LP" : $"{lp} LP";
 
         Items = match.Items
             .Select(id => new IconItem(
@@ -134,6 +145,10 @@ public class MatchViewModel : INotifyPropertyChanged
     public string WhenText { get; }
     public List<IconItem> Items { get; }
 
+    public string LpText { get; } = "";
+    public bool HasLp => LpText.Length > 0;
+    public bool LpGained => _match.LpDelta is > 0;
+
     public bool Won => _match.Won;
 
     /// <summary>Team colours the way the end-of-game screen splits them.</summary>
@@ -143,33 +158,85 @@ public class MatchViewModel : INotifyPropertyChanged
     public bool HasScoreboard => _match.Scoreboard.Count > 0;
 
     private bool _isExpanded;
+    private bool _loaded;
 
     public bool IsExpanded
     {
         get => _isExpanded;
-        set
+        private set
         {
             if (_isExpanded == value) return;
             _isExpanded = value;
-
-            // Build the rows lazily; most matches are never opened.
-            if (_isExpanded && BlueTeam.Count == 0 && RedTeam.Count == 0)
-            {
-                BlueTeam = _match.Scoreboard.Where(p => p.TeamId == 100)
-                    .Select(p => new ScoreboardRowViewModel(_lcu, p)).ToList();
-                RedTeam = _match.Scoreboard.Where(p => p.TeamId != 100)
-                    .Select(p => new ScoreboardRowViewModel(_lcu, p)).ToList();
-
-                OnPropertyChanged(nameof(BlueTeam));
-                OnPropertyChanged(nameof(RedTeam));
-            }
-
             OnPropertyChanged();
             OnPropertyChanged(nameof(ExpandHint));
         }
     }
 
-    public string ExpandHint => _isExpanded ? "HIDE SCOREBOARD" : "VIEW SCOREBOARD";
+    private bool _isLoading;
+
+    public bool IsLoading
+    {
+        get => _isLoading;
+        private set
+        {
+            if (_isLoading == value) return;
+            _isLoading = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ExpandHint));
+        }
+    }
+
+    /// <summary>Opens or closes the scoreboard, fetching the participants the first time.</summary>
+    public async Task ToggleAsync()
+    {
+        if (_isExpanded)
+        {
+            IsExpanded = false;
+            return;
+        }
+
+        if (!_loaded)
+        {
+            _loaded = true;
+            IsLoading = true;
+
+            var players = _match.Scoreboard;
+
+            // The list payload only has us, so pull the real roster on first open.
+            if (players.Count <= 1 && _loadScoreboard != null)
+            {
+                var fetched = await _loadScoreboard(_match.GameId);
+                if (fetched.Count > 0)
+                {
+                    players = fetched;
+                    _match.Scoreboard = fetched;
+                }
+            }
+
+            await IconCache.PreloadAsync(players.SelectMany(p =>
+                new[] { LivePlayerViewModel.ChampionIconPath(p.ChampionId) }
+                    .Concat(p.Items.Select(id =>
+                        _lcu.ItemIcons.TryGetValue(id, out var path) ? path : null))));
+
+            BlueTeam = players.Where(p => p.TeamId == 100)
+                .Select(p => new ScoreboardRowViewModel(_lcu, p)).ToList();
+            RedTeam = players.Where(p => p.TeamId != 100)
+                .Select(p => new ScoreboardRowViewModel(_lcu, p)).ToList();
+
+            IsLoading = false;
+            OnPropertyChanged(nameof(BlueTeam));
+            OnPropertyChanged(nameof(RedTeam));
+            OnPropertyChanged(nameof(ScoreboardMissing));
+        }
+
+        IsExpanded = true;
+    }
+
+    /// <summary>True when the client would not give us the other players.</summary>
+    public bool ScoreboardMissing => _loaded && BlueTeam.Count + RedTeam.Count <= 1;
+
+    public string ExpandHint =>
+        _isLoading ? "LOADING..." : _isExpanded ? "HIDE SCOREBOARD" : "VIEW SCOREBOARD";
 
     /// <summary>Every icon this match needs, for preloading before the list is shown.</summary>
     public static IEnumerable<string?> IconPathsFor(LcuService lcu, MatchSummary match)

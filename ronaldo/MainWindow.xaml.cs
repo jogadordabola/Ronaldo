@@ -21,6 +21,7 @@ public partial class MainWindow
     private readonly ItemSetService _itemSets;
     private readonly GameSessionService _gameSession;
     private readonly ProfileService _profile;
+    private readonly LpTracker _lpTracker;
     private readonly System.Timers.Timer _pollTimer = new(350);
 
     /// <summary>Name used for the rune page this app writes, so it never clobbers a user's own pages.</summary>
@@ -61,6 +62,7 @@ public partial class MainWindow
         _itemSets = new ItemSetService(_lcu);
         _gameSession = new GameSessionService(_lcu);
         _profile = new ProfileService(_lcu);
+        _lpTracker = new LpTracker(_lcu);
 
         WindowPlacement.Restore(this, settings);
 
@@ -258,6 +260,10 @@ public partial class MainWindow
         _gameWasRunning = false;
         await _itemSets.ClearAsync();
         Dispatcher.Invoke(() => SettingsStatus.Text = "Item set removed after the game.");
+
+        // Ranked LP takes a few seconds to settle once the game ends.
+        await Task.Delay(TimeSpan.FromSeconds(6));
+        await _lpTracker.NoteGameEndedAsync();
     }
 
     /// <summary>
@@ -284,6 +290,9 @@ public partial class MainWindow
                 .SelectMany(p => LivePlayerViewModel.IconPathsFor(_lcu, p)));
 
         _shownGameId = game.GameId;
+
+        // Remember the LP this game started from, so its gain/loss can be shown later.
+        await _lpTracker.NoteGameStartedAsync(game.GameId);
 
         Dispatcher.Invoke(() => RenderLiveGame(game));
     }
@@ -738,6 +747,9 @@ public partial class MainWindow
         ProfilePanel.Visibility = Visibility.Visible;
         ProfileHint.Visibility = Visibility.Visible;
 
+        // The champion bar is about champ select, which has nothing to do with the profile.
+        TopBar.Visibility = Visibility.Collapsed;
+
         if (!_lcu.IsConnected)
         {
             ProfileName.Text = "Not connected";
@@ -751,9 +763,13 @@ public partial class MainWindow
         await LoadProfileAsync();
     }
 
-    private void ProfileClose_Click(object sender, RoutedEventArgs e) => CloseProfile();
+    private void HomeBtn_Click(object sender, RoutedEventArgs e) => CloseProfile();
 
-    private void CloseProfile() => ProfilePanel.Visibility = Visibility.Collapsed;
+    private void CloseProfile()
+    {
+        ProfilePanel.Visibility = Visibility.Collapsed;
+        TopBar.Visibility = Visibility.Visible;
+    }
 
     private async Task LoadProfileAsync()
     {
@@ -769,10 +785,16 @@ public partial class MainWindow
         var ranks = await _profile.GetRanksAsync();
         var matches = await _profile.GetMatchHistoryAsync(summoner.Puuid);
 
+        // LP is only known for games this app watched finish; the client keeps no history.
+        foreach (var m in matches.Where(m => m.IsRanked))
+            m.LpDelta = _lpTracker.GetDelta(m.GameId);
+
         // Champion and item icons for every match, so the list renders in one go.
         await IconCache.PreloadAsync(
             matches.SelectMany(m => MatchViewModel.IconPathsFor(_lcu, m))
                    .Append(ProfileIconPath(summoner.ProfileIconId)));
+
+        string puuid = summoner.Puuid;
 
         Dispatcher.Invoke(() =>
         {
@@ -781,7 +803,10 @@ public partial class MainWindow
             ProfileIcon.Source = IconCache.Get(ProfileIconPath(summoner.ProfileIconId));
 
             RankList.ItemsSource = ranks.Select(r => new RankEntryViewModel(r)).ToList();
-            MatchList.ItemsSource = matches.Select(m => new MatchViewModel(_lcu, m)).ToList();
+            MatchList.ItemsSource = matches
+                .Select(m => new MatchViewModel(_lcu, m,
+                    gameId => _profile.GetMatchDetailAsync(gameId, puuid)))
+                .ToList();
 
             if (matches.Count > 0)
             {
@@ -800,10 +825,10 @@ public partial class MainWindow
         $"/lol-game-data/assets/v1/profile-icons/{iconId}.jpg";
 
     /// <summary>Expands or collapses a match to reveal its end-of-game scoreboard.</summary>
-    private void Match_Click(object sender, MouseButtonEventArgs e)
+    private async void Match_Click(object sender, MouseButtonEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.DataContext is MatchViewModel vm)
-            vm.IsExpanded = !vm.IsExpanded;
+            await vm.ToggleAsync();
     }
 
     private async void Filter_SelectionChanged(object sender, SelectionChangedEventArgs e)

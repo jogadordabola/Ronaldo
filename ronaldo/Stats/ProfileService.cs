@@ -60,6 +60,11 @@ public class MatchSummary
     public DateTime PlayedAt { get; set; }
     public List<int> Items { get; set; } = new();
 
+    /// <summary>LP change, when this app saw the game finish. Null otherwise.</summary>
+    public int? LpDelta { get; set; }
+
+    public bool IsRanked => QueueName.StartsWith("Ranked", StringComparison.Ordinal);
+
     /// <summary>All ten players, so the full scoreboard can be shown without another call.</summary>
     public List<ScoreboardPlayer> Scoreboard { get; set; } = new();
 
@@ -185,6 +190,34 @@ public class ProfileService
         catch { }
 
         return matches.OrderByDescending(m => m.PlayedAt).ToList();
+    }
+
+    /// <summary>
+    /// Fetches the full participant list for one game.
+    ///
+    /// The match-history list endpoint only returns the signed-in player in its participants
+    /// array, so a scoreboard has to come from the per-game endpoint instead.
+    /// </summary>
+    public async Task<List<ScoreboardPlayer>> GetMatchDetailAsync(long gameId, string puuid)
+    {
+        string? json = await _lcu.GetAsync($"lol-match-history/v1/games/{gameId}");
+        if (string.IsNullOrEmpty(json)) return new List<ScoreboardPlayer>();
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var game = doc.RootElement;
+
+            // Some builds wrap it as { game: {...} }.
+            if (game.TryGetProperty("game", out var inner) && inner.ValueKind == JsonValueKind.Object)
+                game = inner;
+
+            return ParseGame(game, puuid)?.Scoreboard ?? new List<ScoreboardPlayer>();
+        }
+        catch
+        {
+            return new List<ScoreboardPlayer>();
+        }
     }
 
     private static MatchSummary? ParseGame(JsonElement g, string puuid)
