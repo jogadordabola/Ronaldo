@@ -76,6 +76,55 @@
             <WrapPanel Orientation="Horizontal"/>
         </ItemsPanelTemplate>
 
+        <!-- One player in the live game, laid out like the loading screen -->
+        <DataTemplate x:Key="LivePlayerTemplate">
+            <Border Margin="5" CornerRadius="8" Padding="10,9" Width="212"
+                    BorderThickness="1">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{StaticResource BgCard}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource Edge}"/>
+                        <Style.Triggers>
+                            <!-- Highlight the local player, as the loading screen does -->
+                            <DataTrigger Binding="{Binding IsLocalPlayer}" Value="True">
+                                <Setter Property="Background" Value="{StaticResource BgCardOn}"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource EdgeOn}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <StackPanel Orientation="Horizontal">
+                    <Border CornerRadius="6" Width="48" Height="48" ClipToBounds="True"
+                            Background="#191324">
+                        <Image Source="{Binding ChampionIcon}" Width="48" Height="48"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                    </Border>
+
+                    <StackPanel Margin="9,0,0,0" VerticalAlignment="Center" Width="138">
+                        <ui:TextBlock Text="{Binding Name}" FontTypography="BodyStrong"
+                                      Foreground="{StaticResource TextHi}"
+                                      TextTrimming="CharacterEllipsis"/>
+                        <ui:TextBlock Text="{Binding ChampionName}" Style="{StaticResource Caption}"
+                                      Foreground="{StaticResource Lilac}"
+                                      TextTrimming="CharacterEllipsis"/>
+
+                        <ui:TextBlock Text="{Binding RankText}" Style="{StaticResource Caption}"
+                                      Foreground="{StaticResource Mint}"
+                                      Visibility="{Binding HasRank, Converter={StaticResource BoolToVis}}"
+                                      TextTrimming="CharacterEllipsis"/>
+                        <ui:TextBlock Text="{Binding WinRateText}" Style="{StaticResource Caption}"
+                                      Visibility="{Binding HasWinRate, Converter={StaticResource BoolToVis}}"
+                                      TextTrimming="CharacterEllipsis"/>
+
+                        <ItemsControl ItemsSource="{Binding Spells}" Margin="0,4,0,0"
+                                      ItemTemplate="{StaticResource SmallIconTemplate}"
+                                      ItemsPanel="{StaticResource RowPanel}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <!-- One rune page and its build. Clicking anywhere on the card applies the page. -->
         <DataTemplate x:Key="RunePageTemplate">
             <Border Margin="6,0" CornerRadius="10" BorderThickness="1"
@@ -255,18 +304,16 @@
                 <!-- Wordmark: a badge plus the name, instead of the default plain title -->
                 <ui:TitleBar.Header>
                     <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
-                        <Border Width="24" Height="24" CornerRadius="7" VerticalAlignment="Center">
-                            <Border.Background>
+                        <TextBlock Text="R" FontSize="21" FontWeight="Bold" VerticalAlignment="Center">
+                            <TextBlock.Foreground>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                    <GradientStop Color="#B794F6" Offset="0"/>
-                                    <GradientStop Color="#6D4AA8" Offset="1"/>
+                                    <GradientStop Color="#EDE4FF" Offset="0"/>
+                                    <GradientStop Color="#9F7AEA" Offset="1"/>
                                 </LinearGradientBrush>
-                            </Border.Background>
-                            <TextBlock Text="R" FontSize="14" FontWeight="Bold" Foreground="#17131F"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
+                            </TextBlock.Foreground>
+                        </TextBlock>
                         <TextBlock Text="RONALDO" FontSize="13" FontWeight="Bold"
-                                   VerticalAlignment="Center" Margin="9,0,0,0">
+                                   VerticalAlignment="Center" Margin="8,0,0,0">
                             <TextBlock.Foreground>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                     <GradientStop Color="#EDE4FF" Offset="0"/>
@@ -329,7 +376,8 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <ui:TextBlock Text="DETECTED CHAMPION" Style="{StaticResource Caption}"/>
+                    <ui:TextBlock x:Name="HeaderLabel" Text="DETECTED CHAMPION"
+                                  Style="{StaticResource Caption}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <ui:TextBlock x:Name="ChampNameText" Text="None (hover a champion)"
                                       FontTypography="Title" Foreground="{StaticResource VioletLt}"/>
@@ -383,6 +431,47 @@
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </ScrollViewer>
+
+            <!-- In-game scoreboard -->
+            <Grid x:Name="InGamePanel" Visibility="Collapsed">
+                <Grid.Background>
+                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5"
+                                         RadiusX="0.85" RadiusY="0.85">
+                        <GradientStop Color="#221A38" Offset="0"/>
+                        <GradientStop Color="#14111B" Offset="1"/>
+                    </RadialGradientBrush>
+                </Grid.Background>
+
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <ui:TextBlock Text="YOUR TEAM" Style="{StaticResource Caption}"
+                                  Foreground="{StaticResource Periwinkle}"
+                                  HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <ItemsControl x:Name="TeamOneList" ItemTemplate="{StaticResource LivePlayerTemplate}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+
+                    <Border Height="1" Background="{StaticResource Divider}" Margin="12,20,12,20"/>
+
+                    <ui:TextBlock Text="ENEMY TEAM" Style="{StaticResource Caption}"
+                                  Foreground="{StaticResource Lilac}"
+                                  HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <ItemsControl x:Name="TeamTwoList" ItemTemplate="{StaticResource LivePlayerTemplate}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+
+                    <ui:TextBlock x:Name="InGameNote" Text="" Style="{StaticResource Caption}"
+                                  HorizontalAlignment="Center" Margin="0,20,0,0"
+                                  TextWrapping="Wrap" MaxWidth="700" TextAlignment="Center"/>
+                </StackPanel>
+            </Grid>
 
             <!-- Idle state -->
             <Grid x:Name="IdlePanel" Visibility="Visible">

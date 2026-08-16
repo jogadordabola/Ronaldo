@@ -19,6 +19,7 @@ public partial class MainWindow
     private readonly LcuService _lcu = new();
     private readonly BuildProvider _builds = new();
     private readonly ItemSetService _itemSets;
+    private readonly GameSessionService _gameSession;
     private readonly System.Timers.Timer _pollTimer = new(350);
 
     /// <summary>Name used for the rune page this app writes, so it never clobbers a user's own pages.</summary>
@@ -42,6 +43,8 @@ public partial class MainWindow
     private bool _filtersReady;
     private bool _inChampSelect;
     private bool _gameWasRunning;
+    private bool _inGame;
+    private long _shownGameId;
 
     public MainWindow() : this(AppSettings.Load()) { }
 
@@ -55,6 +58,9 @@ public partial class MainWindow
 
         _settings = settings;
         _itemSets = new ItemSetService(_lcu);
+        _gameSession = new GameSessionService(_lcu);
+
+        WindowPlacement.Restore(this, settings);
 
         PopulateFilters();
         ApplySettingsToControls();
@@ -71,6 +77,7 @@ public partial class MainWindow
         // Run off the UI thread and time-box it: awaiting here would deadlock on Wait().
         Closing += (_, _) =>
         {
+            WindowPlacement.Capture(this, _settings);
             SaveSettings();
             try { Task.Run(() => _itemSets.ClearAsync()).Wait(TimeSpan.FromSeconds(2)); }
             catch { }
@@ -231,7 +238,16 @@ public partial class MainWindow
         if (phase == "InProgress")
         {
             _gameWasRunning = true;
+            _inGame = true;
+            await ShowLiveGameAsync();
             return;
+        }
+
+        if (_inGame)
+        {
+            _inGame = false;
+            _shownGameId = 0;
+            Dispatcher.Invoke(ClearDisplay);
         }
 
         if (!_gameWasRunning) return;
@@ -242,8 +258,88 @@ public partial class MainWindow
         Dispatcher.Invoke(() => SettingsStatus.Text = "Item set removed after the game.");
     }
 
+    /// <summary>
+    /// Loads the live game once per game and renders it as a loading-screen style scoreboard.
+    /// </summary>
+    private async Task ShowLiveGameAsync()
+    {
+        var game = await _gameSession.GetLiveGameAsync();
+        if (game == null) return;
+
+        // The roster doesn't change mid-game, so only build it once.
+        if (game.GameId != 0 && game.GameId == _shownGameId) return;
+
+        var localPuuid = await GetLocalPuuidAsync();
+        foreach (var p in game.TeamOne.Concat(game.TeamTwo))
+            p.IsLocalPlayer = localPuuid.Length > 0 && p.Puuid == localPuuid;
+
+        // Put the local player's team on top, like the loading screen does.
+        if (game.TeamTwo.Any(p => p.IsLocalPlayer))
+            (game.TeamOne, game.TeamTwo) = (game.TeamTwo, game.TeamOne);
+
+        await IconCache.PreloadAsync(
+            game.TeamOne.Concat(game.TeamTwo)
+                .SelectMany(p => LivePlayerViewModel.IconPathsFor(_lcu, p)));
+
+        _shownGameId = game.GameId;
+
+        Dispatcher.Invoke(() => RenderLiveGame(game));
+    }
+
+    private async Task<string> GetLocalPuuidAsync()
+    {
+        string? json = await _lcu.GetAsync("lol-summoner/v1/current-summoner");
+        if (string.IsNullOrEmpty(json)) return "";
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("puuid", out var p) ? p.GetString() ?? "" : "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private void RenderLiveGame(LiveGame game)
+    {
+        HeaderLabel.Text = "STATUS";
+        ChampNameText.Text = "Currently in game";
+        RoleBadge.Text = string.IsNullOrEmpty(game.QueueName) ? "LIVE" : game.QueueName.ToUpperInvariant();
+        PatchBadge.Text = "";
+        SourceLine.Text = "Builds pause until the next champion select.";
+        SourceLine.Foreground = (Brush)FindResource("TextLo");
+
+        TeamOneList.ItemsSource = game.TeamOne.Select(p => new LivePlayerViewModel(_lcu, p)).ToList();
+        TeamTwoList.ItemsSource = game.TeamTwo.Select(p => new LivePlayerViewModel(_lcu, p)).ToList();
+
+        bool anyRank = game.TeamOne.Concat(game.TeamTwo).Any(p => p.RankText.Length > 0);
+        InGameNote.Text = anyRank
+            ? ""
+            : "The League client only reports ranked stats for some players, so ranks may be blank.";
+
+        if (!game.HasPlayers)
+        {
+            InGameNote.Text = "Could not read the player list from the client. " +
+                              $"The raw data was saved to {GameSessionService.DiagnosticPath}";
+        }
+
+        PagesList.ItemsSource = null;
+        _pageViewModels = new List<RunePageViewModel>();
+        _selected = null;
+
+        InGamePanel.Visibility = Visibility.Visible;
+        IdlePanel.Visibility = Visibility.Collapsed;
+        ImportBtn.Visibility = Visibility.Collapsed;
+        HintText.Text = "";
+    }
+
     private async Task HandleChampSelectAsync()
     {
+        // While a game is running the scoreboard owns the view; champ select is over.
+        if (_inGame) return;
+
         string? session = await _lcu.GetAsync("lol-champ-select/v1/session");
 
         if (string.IsNullOrEmpty(session))
@@ -434,6 +530,8 @@ public partial class MainWindow
         _selected = _pageViewModels.FirstOrDefault();
 
         bool hasPages = _pageViewModels.Count > 0;
+        HeaderLabel.Text = "DETECTED CHAMPION";
+        InGamePanel.Visibility = Visibility.Collapsed;
         IdlePanel.Visibility = hasPages ? Visibility.Collapsed : Visibility.Visible;
         ImportBtn.Visibility = hasPages ? Visibility.Visible : Visibility.Collapsed;
 
@@ -453,12 +551,16 @@ public partial class MainWindow
         _selected = null;
 
         PagesList.ItemsSource = null;
+        TeamOneList.ItemsSource = null;
+        TeamTwoList.ItemsSource = null;
         ChampNameText.Text = "None (hover a champion)";
         RoleBadge.Text = "—";
         PatchBadge.Text = "";
         SourceLine.Text = "";
         SourceLine.Foreground = (Brush)FindResource("TextLo");
 
+        HeaderLabel.Text = "DETECTED CHAMPION";
+        InGamePanel.Visibility = Visibility.Collapsed;
         IdlePanel.Visibility = Visibility.Visible;
         IdleTitle.Text = "Waiting for champion select";
         IdleSubtitle.Text = "Hover or lock a champion and your builds appear here.";

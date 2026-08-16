@@ -22,6 +22,13 @@ public class AppSettings
     /// <summary>The forced role, or null for "Auto".</summary>
     public Lane? Lane { get; set; }
 
+    // Window placement, so the app reopens where it was left — including on a second monitor.
+    public double? WindowLeft { get; set; }
+    public double? WindowTop { get; set; }
+    public double? WindowWidth { get; set; }
+    public double? WindowHeight { get; set; }
+    public bool WindowMaximized { get; set; }
+
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "ronaldo", "settings.json");
