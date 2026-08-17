@@ -781,8 +781,11 @@
                                 <StackPanel>
                                     <ui:TextBlock Text="MOST PLAYED" Style="{StaticResource Caption}"
                                                   Foreground="{StaticResource VioletLt}"/>
+                                    <!-- Wraps: the column is narrow and this line grows when
+                                         practice games have been set aside. -->
                                     <ui:TextBlock x:Name="ChampionsNote" Text=""
-                                                  Style="{StaticResource Caption}" Margin="0,2,0,10"/>
+                                                  Style="{StaticResource Caption}" Margin="0,2,0,10"
+                                                  TextWrapping="Wrap"/>
 
                                     <ItemsControl x:Name="ChampionList">
                                         <ItemsControl.ItemTemplate>

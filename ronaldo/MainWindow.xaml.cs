@@ -861,9 +861,15 @@ public partial class MainWindow
             ? await _profile.GetRanksAsync()
             : await _profile.GetRanksForPuuidAsync(summoner.Puuid);
 
-        var matches = isSelf
+        var fetched = isSelf
             ? await _profile.GetMatchHistoryAsync(summoner.Puuid)
             : await _profile.GetMatchHistoryForPuuidAsync(summoner.Puuid, summoner.AccountId);
+
+        // Practice Tool and customs are not results. They record as defeats seconds long, which
+        // drags the champion win rates down and buries the real games. Held to the same standard
+        // as the in-game win rates, which exclude them too.
+        var matches = fetched.Where(m => m.CountsTowardsForm).ToList();
+        int excluded = fetched.Count - matches.Count;
 
         // LP is only known for games this app watched finish, which means our own.
         if (isSelf)
@@ -898,9 +904,16 @@ public partial class MainWindow
             ChampionList.ItemsSource = champions
                 .Select(c => new ChampionStatViewModel(_lcu, c)).ToList();
 
-            // Be explicit that this is a form guide over recent games, not a career total.
+            // Be explicit that this is a form guide over recent games, not a career total, and
+            // never let games vanish silently — say how many were set aside.
+            string skipped = excluded == 0
+                ? ""
+                : excluded == 1
+                    ? " · 1 practice or custom game excluded"
+                    : $" · {excluded} practice and custom games excluded";
+
             ChampionsNote.Text = matchCount > 0
-                ? $"Across the last {matchCount} games"
+                ? $"Across the last {matchCount} games{skipped}"
                 : "No games to summarise";
 
             MatchList.ItemsSource = matches
@@ -915,12 +928,18 @@ public partial class MainWindow
             else
             {
                 ProfileHint.Visibility = Visibility.Visible;
-                ProfileHint.Text = isSelf
-                    ? "No match history came back from the client. " +
-                      "It only serves recent games, and none were returned."
-                    : "The client would not share this player's match history. Riot restricts " +
-                      "this for other players, so it may simply be unavailable.\n\n" +
-                      $"Endpoints tried are listed in {ProfileService.DiagnosticPath}";
+
+                // Games did come back, they just were not real ones. Saying the client returned
+                // nothing would be wrong, and would send you looking for a fault that isn't there.
+                ProfileHint.Text = excluded > 0
+                    ? $"The last {excluded} games were all Practice Tool or customs, which are " +
+                      "left out because they record as defeats and say nothing about form."
+                    : isSelf
+                        ? "No match history came back from the client. " +
+                          "It only serves recent games, and none were returned."
+                        : "The client would not share this player's match history. Riot restricts " +
+                          "this for other players, so it may simply be unavailable.\n\n" +
+                          $"Endpoints tried are listed in {ProfileService.DiagnosticPath}";
             }
         });
     }

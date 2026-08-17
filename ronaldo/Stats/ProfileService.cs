@@ -89,6 +89,12 @@ public class MatchSummary
     public int ChampionId { get; set; }
     public int QueueId { get; set; }
     public string QueueName { get; set; } = "";
+
+    /// <summary>"MATCHED_GAME" or "CUSTOM_GAME", as the client reports it.</summary>
+    public string GameType { get; set; } = "";
+
+    /// <summary>"CLASSIC", "ARAM", "PRACTICETOOL", "TUTORIAL_MODULE", and so on.</summary>
+    public string GameMode { get; set; } = "";
     public bool Won { get; set; }
     public int Kills { get; set; }
     public int Deaths { get; set; }
@@ -110,11 +116,19 @@ public class MatchSummary
     };
 
     /// <summary>
-    /// Whether this game says anything about how the player is doing. Customs and Practice Tool
-    /// come back as queue 0 and are usually one-sided or seconds long, and bot games are free
-    /// wins, so counting either would make a win rate meaningless.
+    /// Whether this game says anything about how the player is doing. Practice Tool runs record
+    /// as defeats seconds long, and bot games are free wins, so counting either makes a win rate
+    /// meaningless.
+    ///
+    /// Keyed on gameType rather than the queue id: Practice Tool reports queue 3140, not 0, so
+    /// screening by id alone lets it straight through. CUSTOM_GAME covers both Practice Tool and
+    /// ordinary customs; gameMode is checked too, in case a build reports the type differently.
     /// </summary>
-    public bool CountsTowardsForm => QueueId > 0 && !BotQueues.Contains(QueueId);
+    public bool CountsTowardsForm =>
+        !GameType.Equals("CUSTOM_GAME", StringComparison.OrdinalIgnoreCase) &&
+        !GameMode.Equals("PRACTICETOOL", StringComparison.OrdinalIgnoreCase) &&
+        !GameMode.StartsWith("TUTORIAL", StringComparison.OrdinalIgnoreCase) &&
+        !BotQueues.Contains(QueueId);
 
     /// <summary>All ten players, so the full scoreboard can be shown without another call.</summary>
     public List<ScoreboardPlayer> Scoreboard { get; set; } = new();
@@ -141,7 +155,7 @@ public class ProfileService
         { 700, "Clash" }, { 720, "ARAM Clash" }, { 830, "Co-op vs AI" },
         { 840, "Co-op vs AI" }, { 850, "Co-op vs AI" }, { 900, "URF" },
         { 1020, "One for All" }, { 1300, "Nexus Blitz" }, { 1700, "Arena" },
-        { 1900, "URF" }, { 2000, "Tutorial" }
+        { 1900, "URF" }, { 2000, "Tutorial" }, { 3140, "Practice Tool" }
     };
 
     public Task<SummonerProfile?> GetSummonerAsync() =>
@@ -380,6 +394,8 @@ public class ProfileService
                 GameId = Long(g, "gameId"),
                 Duration = TimeSpan.FromSeconds(Int(g, "gameDuration")),
                 QueueId = Int(g, "queueId"),
+                GameType = Str(g, "gameType"),
+                GameMode = Str(g, "gameMode"),
                 QueueName = QueueLabel(Int(g, "queueId"), Str(g, "gameMode"))
             };
 

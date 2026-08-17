@@ -73,7 +73,11 @@ Settings live in `%LOCALAPPDATA%\ronaldo\`, alongside a small icon cache.
   flawless record.
 - **Win rates for other players cover their last 20 games**, not the split. The client serves
   at most twenty matches per player and ignores paging, so the window cannot be widened.
-  Customs, Practice Tool, bot games and tutorials are excluded from the tally.
+- **Practice Tool, customs, bot games and tutorials are left out** of every win rate and of the
+  profile's match list and most-played box. They record as defeats seconds long and would drag
+  the numbers down. Note that Practice Tool reports queue id 3140, not 0, so this is keyed on
+  `gameType: CUSTOM_GAME` rather than the queue id. Where games are set aside the profile says
+  how many, so nothing disappears silently.
 - **Other players' match history** can be restricted by Riot, and the surviving route differs
   by client build. Where it comes back empty the app falls back to showing their win count
   alone, and logs the endpoints it tried to `%LOCALAPPDATA%\ronaldo\match-history-probe.txt`.
