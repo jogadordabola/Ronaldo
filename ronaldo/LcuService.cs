@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -64,7 +65,11 @@ public class LcuService
 
             _httpClient = new HttpClient(handler)
             {
-                BaseAddress = new Uri($"https://127.0.0.1:{port}/")
+                BaseAddress = new Uri($"https://127.0.0.1:{port}/"),
+
+                // The client is local and answers in milliseconds. Without a bound, a hung
+                // request would hold the poll gate for the default 100 seconds.
+                Timeout = TimeSpan.FromSeconds(10)
             };
 
             string auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"riot:{password}"));
@@ -220,6 +225,28 @@ public class LcuService
         return _localPuuid;
     }
 
+    /// <summary>
+    /// Decides whether a failed request means the session is gone.
+    ///
+    /// A new League process listens on a new port with a new password, so a dead connection has
+    /// to be thrown away and rebuilt. But a timeout or a single failed read is transient, and
+    /// dropping the shared client for those takes every other caller down with it — including
+    /// the champion-select build fetch, which then falls back to a client that is no longer
+    /// answering and ends up showing no data at all.
+    /// </summary>
+    private void NoteRequestFailed(Exception e)
+    {
+        if (e is HttpRequestException { InnerException: SocketException socket } &&
+            socket.SocketErrorCode is SocketError.ConnectionRefused
+                                   or SocketError.ConnectionReset
+                                   or SocketError.ConnectionAborted
+                                   or SocketError.HostUnreachable
+                                   or SocketError.NotConnected)
+        {
+            _httpClient = null;
+        }
+    }
+
     public async Task<string?> GetAsync(string endpoint)
     {
         if (_httpClient == null) return null;
@@ -229,9 +256,9 @@ public class LcuService
             if (!response.IsSuccessStatusCode) return null;
             return await response.Content.ReadAsStringAsync();
         }
-        catch
+        catch (Exception e)
         {
-            _httpClient = null;
+            NoteRequestFailed(e);
             return null;
         }
     }
@@ -245,9 +272,9 @@ public class LcuService
             var res = await _httpClient.PostAsync(endpoint, content);
             return res.IsSuccessStatusCode;
         }
-        catch
+        catch (Exception e)
         {
-            _httpClient = null;
+            NoteRequestFailed(e);
             return false;
         }
     }
@@ -265,9 +292,9 @@ public class LcuService
             string body = await response.Content.ReadAsStringAsync();
             return ((int)response.StatusCode, body);
         }
-        catch
+        catch (Exception e)
         {
-            _httpClient = null;
+            NoteRequestFailed(e);
             return (0, null);
         }
     }
@@ -281,9 +308,9 @@ public class LcuService
             var res = await _httpClient.PutAsync(endpoint, content);
             return res.IsSuccessStatusCode;
         }
-        catch
+        catch (Exception e)
         {
-            _httpClient = null;
+            NoteRequestFailed(e);
             return false;
         }
     }
@@ -295,6 +322,6 @@ public class LcuService
         {
             await _httpClient.DeleteAsync(endpoint);
         }
-        catch { _httpClient = null; }
+        catch (Exception e) { NoteRequestFailed(e); }
     }
 }

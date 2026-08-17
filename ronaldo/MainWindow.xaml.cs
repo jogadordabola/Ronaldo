@@ -549,7 +549,13 @@ public partial class MainWindow
         if (!hasPages)
         {
             IdleTitle.Text = $"No data for {data.ChampionName}";
-            IdleSubtitle.Text = "Try a different role, rank or region.";
+
+            // Say which of the two it was: a genuinely empty slice, or nothing answering at all.
+            // Suggesting a different role is useless advice when the cause was the network.
+            IdleSubtitle.Text = data.IsFallback
+                ? "op.gg and Lolalytics did not answer, and the client had no recommendation " +
+                  "either. This is usually temporary — re-hover the champion to try again."
+                : "Try a different role, rank or region.";
         }
 
         HintText.Text = hasPages ? "Click a card to apply that rune page" : "";
