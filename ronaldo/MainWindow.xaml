@@ -753,36 +753,6 @@
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
 
-                    <!-- What tends to be bought fourth, fifth and sixth. Reference only:
-                         the item set import stays on the core build above. -->
-                    <Border x:Name="ItemSlotPanel" Visibility="Collapsed"
-                            Background="{StaticResource BgPanel}" CornerRadius="10"
-                            BorderBrush="{StaticResource Edge}" BorderThickness="1"
-                            Margin="6,4,6,10" Padding="14,12">
-                        <StackPanel>
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <ui:TextBlock Grid.Column="0" Text="LATER ITEMS"
-                                              Style="{StaticResource Caption}"
-                                              Foreground="{StaticResource VioletLt}"/>
-                                <ui:TextBlock Grid.Column="1" x:Name="ItemSlotNote" Text=""
-                                              Style="{StaticResource Caption}"/>
-                            </Grid>
-
-                            <ItemsControl x:Name="ItemSlotList"
-                                          ItemTemplate="{StaticResource ItemSlotTemplate}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <UniformGrid Columns="3"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
-
                     <!-- Lane matchups, from the same op.gg request as the builds -->
                     <Border x:Name="MatchupPanel" Visibility="Collapsed"
                             Background="{StaticResource BgPanel}" CornerRadius="10"
@@ -1036,7 +1006,9 @@
                     </RadialGradientBrush>
                 </Grid.Background>
 
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <!-- Scrolls: the later-items table below the scoreboard can outgrow a short window. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,10">
                     <ui:TextBlock Text="YOUR TEAM" Style="{StaticResource Caption}"
                                   Foreground="{StaticResource Periwinkle}"
                                   HorizontalAlignment="Center" Margin="0,0,0,6"/>
@@ -1068,7 +1040,38 @@
                     <ui:TextBlock x:Name="InGameNote" Text="" Style="{StaticResource Caption}"
                                   HorizontalAlignment="Center" Margin="0,8,0,0"
                                   TextWrapping="Wrap" MaxWidth="700" TextAlignment="Center"/>
+
+                    <!-- What to buy next, for the champion being played. Here rather than in
+                         champion select: the item path only matters once the game is running. -->
+                    <Border x:Name="ItemSlotPanel" Visibility="Collapsed" Width="1080"
+                            Background="{StaticResource BgPanel}" CornerRadius="10"
+                            BorderBrush="{StaticResource Edge}" BorderThickness="1"
+                            Margin="0,20,0,0" Padding="14,12">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBlock Grid.Column="0" x:Name="ItemSlotTitle" Text="LATER ITEMS"
+                                              Style="{StaticResource Caption}"
+                                              Foreground="{StaticResource VioletLt}"/>
+                                <ui:TextBlock Grid.Column="1" x:Name="ItemSlotNote" Text=""
+                                              Style="{StaticResource Caption}"/>
+                            </Grid>
+
+                            <ItemsControl x:Name="ItemSlotList"
+                                          ItemTemplate="{StaticResource ItemSlotTemplate}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="3"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
+                </ScrollViewer>
             </Grid>
 
             <!-- Idle state -->

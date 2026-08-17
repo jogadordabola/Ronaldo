@@ -13,8 +13,6 @@ winning with — then applies them with one click.
 - Three distinct rune pages per champion, ranked by pick rate, each with win rate and sample size
 - Item build per page, filtered to the games that ran *that keystone*
 - Starting items, boots, summoner spells and situational items, all as icons
-- What tends to be bought fourth, fifth and sixth, most picked first, with a win rate and
-  sample for each. Shown for reference only — the item set import stays on the core build
 - Click any page to apply it to the client; the top page can auto-apply
 - Lane matchups: the five opponents this champion beats most and the five it loses to most,
   by win rate, with the sample behind each. Follows the same role, rank and region filters
@@ -27,6 +25,10 @@ winning with — then applies them with one click.
   summoner spells, ranked stats and champion mastery
 - Players the client hides — streamer mode, privacy settings — are put back from the champion
   selections rather than leaving a gap, so a team is never short a card
+- What to build next: the popular fourth, fifth and sixth items for the champion you are
+  playing, most picked first, each with a win rate and sample. Here rather than in champion
+  select, since the item path is only a decision once the game is running. Shown for reference
+  only — the item set import stays on the core build
 - Win rate for every player, counted from their last 20 games. Riot only publishes loss counts
   for your own account, so for everyone else the record is tallied from their match history
   rather than read off their profile

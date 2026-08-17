@@ -73,10 +73,6 @@ public class BuildProvider
         data.LanePlayRates = opgg.LaneRates;
         data.Matchups = RankMatchups(opgg.Counters);
 
-        // One extra request, and only once the lane is settled. Shown for reference only: the
-        // item set import stays on the core build.
-        data.ItemSlots = TrimItemSlots(
-            await _opgg.GetItemSlotsAsync(championId, data.Lane, rank, region, ct));
 
         var pages = BuildPages(lcu, opgg);
         if (pages.Count == 0)
@@ -94,6 +90,16 @@ public class BuildProvider
 
         return data;
     }
+
+    /// <summary>
+    /// Popular items per purchase slot, fetched on its own.
+    ///
+    /// Used in game rather than in champion select: which item goes fourth or fifth is only a
+    /// decision once the game is running, so it is not worth a request while hovering.
+    /// </summary>
+    public async Task<List<ItemSlot>> GetItemSlotsAsync(
+        int championId, Lane lane, StatsRank rank, StatsRegion region, CancellationToken ct = default) =>
+        TrimItemSlots(await _opgg.GetItemSlotsAsync(championId, lane, rank, region, ct));
 
     /// <summary>
     /// Drops slot options with too thin a sample, and any slot left with nothing.

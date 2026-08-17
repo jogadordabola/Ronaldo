@@ -295,7 +295,47 @@ public partial class MainWindow
         // Remember the LP this game started from, so its gain/loss can be shown later.
         await _lpTracker.NoteGameStartedAsync(game.GameId);
 
-        Dispatcher.Invoke(() => RenderLiveGame(game));
+        var (slots, champion, lane) = await LoadLiveItemSlotsAsync(game);
+
+        await IconCache.PreloadAsync(slots
+            .SelectMany(s => s.Items.Take(OptionsPerSlot))
+            .Select(i => _lcu.ItemIcons.TryGetValue(i.ItemId, out var p) ? p : null));
+
+        Dispatcher.Invoke(() =>
+        {
+            RenderLiveGame(game);
+
+            if (slots.Count > 0) RenderItemSlots(slots, champion, lane);
+            else ItemSlotPanel.Visibility = Visibility.Collapsed;
+        });
+    }
+
+    /// <summary>
+    /// Fetches the item slots for the champion you are playing, in the lane the client assigned.
+    ///
+    /// Returns nothing when there is no lane to ask about — ARAM and customs report no position,
+    /// and the ranked slice op.gg serves would not describe those games anyway.
+    /// </summary>
+    private async Task<(List<ItemSlot> Slots, string Champion, Lane Lane)> LoadLiveItemSlotsAsync(
+        LiveGame game)
+    {
+        var none = (new List<ItemSlot>(), "", Lane.Mid);
+
+        var me = game.TeamOne.Concat(game.TeamTwo).FirstOrDefault(p => p.IsLocalPlayer);
+        if (me == null || me.ChampionId <= 0) return none;
+
+        var lane = StatsCatalog.LaneFromLcuPosition(me.Position);
+        if (lane == null) return none;
+
+        string champion = _lcu.ChampionData.TryGetValue(me.ChampionId, out var c)
+            ? c.Name
+            : $"#{me.ChampionId}";
+
+        var rank = Dispatcher.Invoke(() => SelectedRank);
+        var region = Dispatcher.Invoke(() => SelectedRegion);
+
+        var slots = await _builds.GetItemSlotsAsync(me.ChampionId, lane.Value, rank, region);
+        return (slots, champion, lane.Value);
     }
 
     private void RenderLiveGame(LiveGame game)
@@ -482,10 +522,7 @@ public partial class MainWindow
         await IconCache.PreloadAsync(
             data.Pages.SelectMany(p => RunePageViewModel.IconPathsFor(_lcu, p))
                 .Concat(ShownMatchups(data)
-                    .Select(m => LivePlayerViewModel.ChampionIconPath(m.OpponentId)))
-                .Concat(LaterSlots(data)
-                    .SelectMany(s => s.Items.Take(OptionsPerSlot))
-                    .Select(i => _lcu.ItemIcons.TryGetValue(i.ItemId, out var p) ? p : null)));
+                    .Select(m => LivePlayerViewModel.ChampionIconPath(m.OpponentId))));
 
         if (championId != _lastChampionId) return;
 
@@ -549,7 +586,6 @@ public partial class MainWindow
         PagesList.ItemsSource = _pageViewModels;
         _selected = _pageViewModels.FirstOrDefault();
 
-        RenderItemSlots(data);
         RenderMatchups(data);
 
         bool hasPages = _pageViewModels.Count > 0;
@@ -580,36 +616,35 @@ public partial class MainWindow
     private static readonly int[] LaterItemSlots = { 4, 5, 6 };
     private const int OptionsPerSlot = 5;
 
-    /// <summary>The slots worth showing: the ones past the core build, in order.</summary>
-    private static List<ItemSlot> LaterSlots(ChampionBuildData data) =>
-        LaterItemSlots
-            .Select(n => data.ItemSlots.FirstOrDefault(s => s.Slot == n))
+    /// <summary>
+    /// Fills the fourth/fifth/sixth item columns for the champion being played. Shown for
+    /// reference only — the item set import stays on the core build, so nothing here is applied.
+    /// </summary>
+    private void RenderItemSlots(List<ItemSlot> slots, string championName, Lane lane)
+    {
+        var shown = LaterItemSlots
+            .Select(n => slots.FirstOrDefault(s => s.Slot == n))
             .Where(s => s is { Items.Count: > 0 })
             .Select(s => s!)
             .ToList();
 
-    /// <summary>
-    /// Fills the fourth/fifth/sixth item columns. These are shown for reference only — the item
-    /// set import stays on the core build, so nothing here reaches the client.
-    /// </summary>
-    private void RenderItemSlots(ChampionBuildData data)
-    {
-        var slots = LaterSlots(data);
-
-        if (slots.Count == 0)
+        if (shown.Count == 0)
         {
             ItemSlotPanel.Visibility = Visibility.Collapsed;
             ItemSlotList.ItemsSource = null;
             return;
         }
 
-        ItemSlotList.ItemsSource = slots
+        ItemSlotList.ItemsSource = shown
             .Select(s => new ItemSlotViewModel(_lcu, s, OptionsPerSlot))
             .ToList();
 
-        // Say when a slot is missing, or its absence looks like a bug rather than a champion
-        // that seldom gets that far.
-        ItemSlotNote.Text = slots.Count == LaterItemSlots.Length
+        ItemSlotTitle.Text = $"WHAT TO BUILD NEXT · {championName.ToUpperInvariant()} " +
+                             $"· {StatsCatalog.LaneLabel(lane).ToUpperInvariant()}";
+
+        // Say when a slot is missing, so its absence reads as a champion that seldom gets that
+        // far rather than as a bug.
+        ItemSlotNote.Text = shown.Count == LaterItemSlots.Length
             ? "most picked first · not imported"
             : "most picked first · not imported · slots this champion rarely reaches are hidden";
 

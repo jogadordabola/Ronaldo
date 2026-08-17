@@ -119,8 +119,6 @@ public class ChampionBuildData
     /// <summary>Lane matchups, best win rate first. Empty when the source had none.</summary>
     public List<ChampionMatchup> Matchups { get; set; } = new();
 
-    /// <summary>Popular items per purchase slot, keyed by slot number. Shown, never imported.</summary>
-    public List<ItemSlot> ItemSlots { get; set; } = new();
 
     /// <summary>Set when every online source failed and we fell back to the in-client data.</summary>
     public bool IsFallback { get; set; }
