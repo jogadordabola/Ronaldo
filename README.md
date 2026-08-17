@@ -14,6 +14,8 @@ winning with — then applies them with one click.
 - Item build per page, filtered to the games that ran *that keystone*
 - Starting items, boots, summoner spells and situational items, all as icons
 - Click any page to apply it to the client; the top page can auto-apply
+- Lane matchups: the five opponents this champion beats most and the five it loses to most,
+  by win rate, with the sample behind each. Follows the same role, rank and region filters
 - Rank and region filters (Platinum+ through Challenger, World or a single server)
 - Manual role override — needed in Practice Tool and blind pick, where the client reports no
   assigned position and the role would otherwise be guessed from play rate
@@ -42,7 +44,7 @@ winning with — then applies them with one click.
 
 | Source | Used for |
 |---|---|
-| [op.gg](https://op.gg) | Rune pages with pick/win rates, item builds, summoner spells, positions |
+| [op.gg](https://op.gg) | Rune pages with pick/win rates, item builds, summoner spells, positions, lane matchups |
 | [Lolalytics](https://lolalytics.com) | Item builds filtered to a specific keystone |
 | League Client (LCU) | Your profile, rank, match history, live game, mastery, item sets, and other players' recent form |
 | [Community Dragon](https://communitydragon.org) | Champion, item, rune and rank icons |
@@ -83,6 +85,10 @@ Settings live in `%LOCALAPPDATA%\ronaldo\`, alongside a small icon cache.
   alone, and logs the endpoints it tried to `%LOCALAPPDATA%\ronaldo\match-history-probe.txt`.
 - The client only serves **recent** matches, so "most played" is a form guide over that
   window rather than a career total.
+- **Rare lane matchups are dropped**, since a matchup seen forty times can read 60% on noise
+  alone and would top the table ahead of a real counter. A matchup needs 50 games and a tenth
+  of the games of the most common one. The sample is shown next to every win rate so the
+  thinner ones can be judged on sight.
 - Rune pages are written under the name `Ronaldo Build`, and item sets under `Ronaldo · …`.
   Only pages and sets with those names are ever deleted; your own are left alone.
 

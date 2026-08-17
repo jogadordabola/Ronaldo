@@ -31,6 +31,31 @@ public class ChampionStatViewModel
     public bool IsStrong { get; }
 }
 
+/// <summary>One lane matchup in the strong/weak lists.</summary>
+public class MatchupViewModel
+{
+    public MatchupViewModel(LcuService lcu, ChampionMatchup matchup)
+    {
+        Icon = IconCache.Get(LivePlayerViewModel.ChampionIconPath(matchup.OpponentId));
+        Name = lcu.ChampionData.TryGetValue(matchup.OpponentId, out var c)
+            ? c.Name
+            : $"#{matchup.OpponentId}";
+
+        WinRateText = matchup.WinRatePercent.ToString("0", CultureInfo.InvariantCulture) + "%";
+
+        // The sample is worth showing: these are single matchups, so they are far thinner than
+        // the champion-wide numbers on the rune cards.
+        GamesText = matchup.Play == 1 ? "1 game" : $"{matchup.Play:N0} games";
+        IsFavourable = matchup.IsFavourable;
+    }
+
+    public ImageSource? Icon { get; }
+    public string Name { get; }
+    public string WinRateText { get; }
+    public string GamesText { get; }
+    public bool IsFavourable { get; }
+}
+
 public class RankEntryViewModel
 {
     public RankEntryViewModel(RankEntry entry)

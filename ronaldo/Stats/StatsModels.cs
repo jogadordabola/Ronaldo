@@ -62,6 +62,22 @@ public enum LaneSource
 }
 
 /// <summary>Everything the UI shows for one champion at one lane/rank/region.</summary>
+/// <summary>
+/// How the champion fares against one opponent in the same lane, over the rank and region
+/// currently selected. Win and play are this champion's, not the opponent's.
+/// </summary>
+public class ChampionMatchup
+{
+    public int OpponentId { get; set; }
+    public int Play { get; set; }
+    public int Win { get; set; }
+
+    public double WinRatePercent => Play > 0 ? Win * 100.0 / Play : 0;
+
+    /// <summary>Above an even matchup, so this is a lane the champion tends to win.</summary>
+    public bool IsFavourable => WinRatePercent >= 50;
+}
+
 public class ChampionBuildData
 {
     public int ChampionId { get; set; }
@@ -76,6 +92,9 @@ public class ChampionBuildData
 
     /// <summary>Play rate per lane, used to show where the champion is actually played.</summary>
     public Dictionary<Lane, double> LanePlayRates { get; set; } = new();
+
+    /// <summary>Lane matchups, best win rate first. Empty when the source had none.</summary>
+    public List<ChampionMatchup> Matchups { get; set; } = new();
 
     /// <summary>Set when every online source failed and we fell back to the in-client data.</summary>
     public bool IsFallback { get; set; }

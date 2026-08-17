@@ -24,6 +24,16 @@ public class BuildProvider
 
     private const int MaxPages = 3;
 
+    /// <summary>Absolute floor on a matchup's sample, however rarely the champion is played.</summary>
+    private const int MinMatchupGames = 50;
+
+    /// <summary>
+    /// A matchup also has to be worth at least this fraction of the most common one. Set from
+    /// measurement: at a twentieth, a top-of-table champion was fine but Mordekaiser's best and
+    /// worst matchups were both its smallest samples — a 72% read off 36 games.
+    /// </summary>
+    private const int MatchupShareOfBusiest = 10;
+
     /// <param name="assignedLane">
     /// The lane to build for, or null to let op.gg's play rates decide. A non-null lane is
     /// always honoured, so a manual override is never second-guessed by the auto-detection.
@@ -58,6 +68,7 @@ public class BuildProvider
             return await FallbackAsync(lcu, data, ct);
 
         data.LanePlayRates = opgg.LaneRates;
+        data.Matchups = RankMatchups(opgg.Counters);
 
         var pages = BuildPages(lcu, opgg);
         if (pages.Count == 0)
@@ -74,6 +85,28 @@ public class BuildProvider
             : "op.gg";
 
         return data;
+    }
+
+    /// <summary>
+    /// Orders the lane matchups by win rate, best first, after dropping the ones too rare to
+    /// mean anything.
+    ///
+    /// The tail of the list is where the extremes live: a matchup seen forty times can read
+    /// 60% on nothing but noise and would top the table ahead of a real counter. The floor is
+    /// relative to the most common matchup, so it adapts to champions and ranks where every
+    /// matchup is rare, rather than emptying the table.
+    /// </summary>
+    private static List<ChampionMatchup> RankMatchups(List<ChampionMatchup> counters)
+    {
+        if (counters.Count == 0) return new List<ChampionMatchup>();
+
+        int busiest = counters.Max(c => c.Play);
+        int floor = Math.Max(MinMatchupGames, busiest / MatchupShareOfBusiest);
+
+        return counters
+            .Where(c => c.Play >= floor)
+            .OrderByDescending(c => c.WinRatePercent)
+            .ToList();
     }
 
     /// <summary>

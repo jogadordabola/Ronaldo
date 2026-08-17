@@ -48,6 +48,9 @@ public class OpGgChampion
     /// <summary>Share of this champion's games played in each lane, from summary.positions.</summary>
     public Dictionary<Lane, double> LaneRates { get; set; } = new();
 
+    /// <summary>Same-lane matchups, as op.gg returns them (ordered by how often they occur).</summary>
+    public List<ChampionMatchup> Counters { get; set; } = new();
+
     public Lane? BestLane { get; set; }
     public int TotalPlay { get; set; }
 }
@@ -82,7 +85,8 @@ public class OpGgClient
                 StarterItems = ReadOptions(data, "starter_items"),
                 Boots = ReadOptions(data, "boots"),
                 LastItems = ReadOptions(data, "last_items"),
-                SummonerSpells = ReadOptions(data, "summoner_spells")
+                SummonerSpells = ReadOptions(data, "summoner_spells"),
+                Counters = ReadCounters(data)
             };
 
             ReadPositions(data, champ);
@@ -120,6 +124,31 @@ public class OpGgClient
         }
 
         return pages;
+    }
+
+    /// <summary>
+    /// Reads the lane matchups. op.gg returns one entry per opponent for the position asked
+    /// about, with this champion's games and wins against them.
+    /// </summary>
+    private static List<ChampionMatchup> ReadCounters(JsonElement data)
+    {
+        var counters = new List<ChampionMatchup>();
+        if (!data.TryGetProperty("counters", out var arr) || arr.ValueKind != JsonValueKind.Array)
+            return counters;
+
+        foreach (var c in arr.EnumerateArray())
+        {
+            var matchup = new ChampionMatchup
+            {
+                OpponentId = GetInt(c, "champion_id"),
+                Play = GetInt(c, "play"),
+                Win = GetInt(c, "win")
+            };
+
+            if (matchup.OpponentId > 0 && matchup.Play > 0) counters.Add(matchup);
+        }
+
+        return counters;
     }
 
     private static List<OpGgOption> ReadOptions(JsonElement data, string property)

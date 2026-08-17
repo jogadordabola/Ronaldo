@@ -337,6 +337,7 @@ public partial class MainWindow
         }
 
         PagesList.ItemsSource = null;
+        MatchupPanel.Visibility = Visibility.Collapsed;
         _pageViewModels = new List<RunePageViewModel>();
         _selected = null;
 
@@ -475,8 +476,12 @@ public partial class MainWindow
         // The user may have hovered a different champion while this was in flight.
         if (championId != _lastChampionId) return;
 
-        // Fetch icons before building the cards so they render complete.
-        await IconCache.PreloadAsync(data.Pages.SelectMany(p => RunePageViewModel.IconPathsFor(_lcu, p)));
+        // Fetch icons before building the cards so they render complete. Only the matchups that
+        // actually get shown are worth fetching: op.gg returns dozens, and ten appear.
+        await IconCache.PreloadAsync(
+            data.Pages.SelectMany(p => RunePageViewModel.IconPathsFor(_lcu, p))
+                .Concat(ShownMatchups(data)
+                    .Select(m => LivePlayerViewModel.ChampionIconPath(m.OpponentId))));
 
         if (championId != _lastChampionId) return;
 
@@ -540,6 +545,8 @@ public partial class MainWindow
         PagesList.ItemsSource = _pageViewModels;
         _selected = _pageViewModels.FirstOrDefault();
 
+        RenderMatchups(data);
+
         bool hasPages = _pageViewModels.Count > 0;
         HeaderLabel.Text = "DETECTED CHAMPION";
         InGamePanel.Visibility = Visibility.Collapsed;
@@ -561,6 +568,55 @@ public partial class MainWindow
         HintText.Text = hasPages ? "Click a card to apply that rune page" : "";
     }
 
+    /// <summary>How many opponents each of the two matchup lists shows.</summary>
+    private const int MatchupsPerSide = 5;
+
+    /// <summary>
+    /// Splits the matchups into the two lists shown. They arrive ordered by win rate, so the
+    /// two ends of the list are the two sides. Halving the count keeps a matchup from appearing
+    /// on both sides when there are fewer than ten to go round, and the weak side is reversed so
+    /// it leads with the hardest one.
+    /// </summary>
+    private static (List<ChampionMatchup> Strong, List<ChampionMatchup> Weak) SplitMatchups(
+        ChampionBuildData data)
+    {
+        var ranked = data.Matchups;
+        if (ranked.Count < 2) return (new List<ChampionMatchup>(), new List<ChampionMatchup>());
+
+        int perSide = Math.Min(MatchupsPerSide, ranked.Count / 2);
+
+        return (ranked.Take(perSide).ToList(),
+                ranked.Skip(ranked.Count - perSide).Reverse().ToList());
+    }
+
+    /// <summary>Just the matchups that reach the screen, for preloading their portraits.</summary>
+    private static IEnumerable<ChampionMatchup> ShownMatchups(ChampionBuildData data)
+    {
+        var (strong, weak) = SplitMatchups(data);
+        return strong.Concat(weak);
+    }
+
+    private void RenderMatchups(ChampionBuildData data)
+    {
+        var (strong, weak) = SplitMatchups(data);
+
+        if (strong.Count == 0)
+        {
+            MatchupPanel.Visibility = Visibility.Collapsed;
+            StrongList.ItemsSource = null;
+            WeakList.ItemsSource = null;
+            return;
+        }
+
+        StrongList.ItemsSource = strong.Select(m => new MatchupViewModel(_lcu, m)).ToList();
+        WeakList.ItemsSource = weak.Select(m => new MatchupViewModel(_lcu, m)).ToList();
+
+        MatchupNote.Text = $"{StatsCatalog.LaneLabel(data.Lane)} · " +
+                           $"{data.Matchups.Count} matchups · {StatsCatalog.RankLabel(data.Rank)}";
+
+        MatchupPanel.Visibility = Visibility.Visible;
+    }
+
     private void ClearDisplay()
     {
         _current = null;
@@ -570,6 +626,9 @@ public partial class MainWindow
         PagesList.ItemsSource = null;
         TeamOneList.ItemsSource = null;
         TeamTwoList.ItemsSource = null;
+        StrongList.ItemsSource = null;
+        WeakList.ItemsSource = null;
+        MatchupPanel.Visibility = Visibility.Collapsed;
         ChampNameText.Text = "None (hover a champion)";
         RoleBadge.Text = "—";
         PatchBadge.Text = "";
