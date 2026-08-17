@@ -23,6 +23,12 @@ public class LivePlayer
     public string RankText { get; set; } = "";
     public string WinRateText { get; set; } = "";
 
+    /// <summary>
+    /// True when <see cref="WinRateText"/> is a real win rate rather than a bare win count.
+    /// For other players that means it was counted from their recent games.
+    /// </summary>
+    public bool HasRealWinRate { get; set; }
+
     /// <summary>Mastery on the champion being played, e.g. "M7 · 245K". Blank if unavailable.</summary>
     public string MasteryText { get; set; } = "";
 }
@@ -49,11 +55,13 @@ public class GameSessionService
 {
     private readonly LcuService _lcu;
     private readonly MasteryService _mastery;
+    private readonly ProfileService _profiles;
 
     public GameSessionService(LcuService lcu)
     {
         _lcu = lcu;
         _mastery = new MasteryService(lcu);
+        _profiles = new ProfileService(lcu);
     }
 
     /// <summary>Where the raw session is dumped when parsing finds no players.</summary>
@@ -80,8 +88,14 @@ public class GameSessionService
         // If the shape changed, keep the payload so the mapping can be corrected.
         if (!game.HasPlayers) SaveDiagnostic(json);
 
+        // Needed before ranks are read: the client serves fuller stats for the signed-in player.
+        string localPuuid = await _lcu.GetLocalPuuidAsync();
+        foreach (var p in game.TeamOne.Concat(game.TeamTwo))
+            p.IsLocalPlayer = localPuuid.Length > 0 && p.Puuid == localPuuid;
+
         await FillNamesAsync(game);
         await FillRanksAsync(game);
+        await FillRecentFormAsync(game);
         await _mastery.FillAsync(game.TeamOne.Concat(game.TeamTwo));
 
         return game;
@@ -217,11 +231,60 @@ public class GameSessionService
 
                 int wins = Int(solo, "wins");
                 int losses = Int(solo, "losses");
-                if (wins + losses > 0)
-                    p.WinRateText = $"{wins * 100.0 / (wins + losses):0}% WR ({wins}W {losses}L)";
+
+                // Riot only serves the loss count for the signed-in player. Everyone else comes
+                // back as losses = 0, so treating it as real would show every opponent on a
+                // flawless 100% record. Their rate is counted from their games instead, below.
+                if (p.IsLocalPlayer)
+                {
+                    if (wins + losses > 0)
+                    {
+                        p.WinRateText = $"{wins * 100.0 / (wins + losses):0}% WR ({wins}W {losses}L)";
+                        p.HasRealWinRate = true;
+                    }
+                }
+                else if (wins > 0)
+                {
+                    // Stands in until FillRecentFormAsync can work out a real rate from their games.
+                    p.WinRateText = wins == 1 ? "1 win" : $"{wins} wins";
+                }
             }
             catch { }
         }
+    }
+
+    /// <summary>
+    /// Works out a real win rate for the other players by counting their recent games.
+    ///
+    /// Riot withholds their split loss count, but their match history is readable, so the wins
+    /// and losses in it can be counted directly. The client serves at most twenty games and
+    /// ignores paging, so that window is as wide as this can get — which is why the count is
+    /// shown alongside the rate rather than presented as a career figure.
+    /// </summary>
+    private async Task FillRecentFormAsync(LiveGame game)
+    {
+        var others = game.TeamOne.Concat(game.TeamTwo)
+            .Where(p => !p.IsLocalPlayer && p.Puuid.Length > 0)
+            .ToList();
+
+        // Run together rather than in turn. The client answers in about 25ms each, so this is
+        // not a bottleneck either way, but the scoreboard waits on all of them before it renders.
+        await Task.WhenAll(others.Select(FillOneRecentFormAsync));
+    }
+
+    private async Task FillOneRecentFormAsync(LivePlayer p)
+    {
+        var matches = await _profiles.GetMatchHistoryForPuuidAsync(p.Puuid, accountId: 0);
+
+        // Riot restricts this for some accounts. Leave the bare win count in place when it fails.
+        var games = matches.Where(m => m.CountsTowardsForm).ToList();
+        if (games.Count == 0) return;
+
+        int wins = games.Count(m => m.Won);
+        int losses = games.Count - wins;
+
+        p.WinRateText = $"{wins * 100.0 / games.Count:0}% WR · {wins}W {losses}L";
+        p.HasRealWinRate = true;
     }
 
     private static string Capitalize(string s) =>

@@ -70,6 +70,9 @@ public class LcuService
             string auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"riot:{password}"));
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", auth);
 
+            // A reconnect may be a different account, so the cached identity is no longer valid.
+            _localPuuid = null;
+
             await LoadGameDataAsync();
             return true;
         }
@@ -189,6 +192,32 @@ public class LcuService
             }
         }
         catch { }
+    }
+
+    private string? _localPuuid;
+
+    /// <summary>
+    /// The signed-in player's puuid. Fetched once and cached: it decides which stats the client
+    /// will share, so several call sites need it, and it cannot change without a reconnect.
+    /// </summary>
+    public async Task<string> GetLocalPuuidAsync()
+    {
+        if (_localPuuid != null) return _localPuuid;
+
+        string? json = await GetAsync("lol-summoner/v1/current-summoner");
+        if (string.IsNullOrEmpty(json)) return "";
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            _localPuuid = doc.RootElement.TryGetProperty("puuid", out var p) ? p.GetString() ?? "" : "";
+        }
+        catch
+        {
+            return "";
+        }
+
+        return _localPuuid;
     }
 
     public async Task<string?> GetAsync(string endpoint)

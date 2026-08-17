@@ -27,9 +27,18 @@ public class RankEntry
     public int Wins { get; set; }
     public int Losses { get; set; }
 
+    /// <summary>
+    /// False when the client withheld the loss count. Riot serves losses only for the
+    /// signed-in player, so for anyone else the zero it returns means "unknown", not "none".
+    /// </summary>
+    public bool LossesKnown { get; set; } = true;
+
     public bool IsRanked => Tier.Length > 0 && !Tier.Equals("NONE", StringComparison.OrdinalIgnoreCase);
     public int Games => Wins + Losses;
     public double WinRate => Games > 0 ? Wins * 100.0 / Games : 0;
+
+    /// <summary>A win rate is only meaningful once the losses behind it are known.</summary>
+    public bool HasWinRate => LossesKnown && Games > 0;
 
     /// <summary>
     /// Rank crest. These live outside the game-data plugin, so it's a full URL.
@@ -56,6 +65,10 @@ public class ChampionStat
 public class ScoreboardPlayer
 {
     public string Name { get; set; } = "";
+
+    /// <summary>Set from the per-game endpoint, which unlike the history list names all ten.</summary>
+    public string Puuid { get; set; } = "";
+
     public int ChampionId { get; set; }
     public int TeamId { get; set; }
     public int Kills { get; set; }
@@ -74,6 +87,7 @@ public class MatchSummary
 {
     public long GameId { get; set; }
     public int ChampionId { get; set; }
+    public int QueueId { get; set; }
     public string QueueName { get; set; } = "";
     public bool Won { get; set; }
     public int Kills { get; set; }
@@ -88,6 +102,19 @@ public class MatchSummary
     public int? LpDelta { get; set; }
 
     public bool IsRanked => QueueName.StartsWith("Ranked", StringComparison.Ordinal);
+
+    /// <summary>Co-op vs AI, in every intro/beginner/intermediate flavour, plus the tutorials.</summary>
+    private static readonly HashSet<int> BotQueues = new()
+    {
+        830, 840, 850, 870, 880, 890, 2000, 2010, 2020
+    };
+
+    /// <summary>
+    /// Whether this game says anything about how the player is doing. Customs and Practice Tool
+    /// come back as queue 0 and are usually one-sided or seconds long, and bot games are free
+    /// wins, so counting either would make a win rate meaningless.
+    /// </summary>
+    public bool CountsTowardsForm => QueueId > 0 && !BotQueues.Contains(QueueId);
 
     /// <summary>All ten players, so the full scoreboard can be shown without another call.</summary>
     public List<ScoreboardPlayer> Scoreboard { get; set; } = new();
@@ -154,12 +181,16 @@ public class ProfileService
     }
 
     public Task<List<RankEntry>> GetRanksAsync() =>
-        ReadRanksAsync("lol-ranked/v1/current-ranked-stats");
+        ReadRanksAsync("lol-ranked/v1/current-ranked-stats", lossesKnown: true);
 
+    /// <summary>
+    /// Another player's rank. The payload is shaped like our own but the loss count is always
+    /// zeroed out, so the entries come back flagged as having no usable losses.
+    /// </summary>
     public Task<List<RankEntry>> GetRanksForPuuidAsync(string puuid) =>
-        ReadRanksAsync($"lol-ranked/v1/ranked-stats/{puuid}");
+        ReadRanksAsync($"lol-ranked/v1/ranked-stats/{puuid}", lossesKnown: false);
 
-    private async Task<List<RankEntry>> ReadRanksAsync(string endpoint)
+    private async Task<List<RankEntry>> ReadRanksAsync(string endpoint, bool lossesKnown)
     {
         var result = new List<RankEntry>();
 
@@ -183,7 +214,8 @@ public class ProfileService
                     Division = Str(q, "division"),
                     LeaguePoints = Int(q, "leaguePoints"),
                     Wins = Int(q, "wins"),
-                    Losses = Int(q, "losses")
+                    Losses = lossesKnown ? Int(q, "losses") : 0,
+                    LossesKnown = lossesKnown
                 };
 
                 result.Add(entry);
@@ -347,6 +379,7 @@ public class ProfileService
             {
                 GameId = Long(g, "gameId"),
                 Duration = TimeSpan.FromSeconds(Int(g, "gameDuration")),
+                QueueId = Int(g, "queueId"),
                 QueueName = QueueLabel(Int(g, "queueId"), Str(g, "gameMode"))
             };
 
@@ -383,6 +416,7 @@ public class ProfileService
                 var player = new ScoreboardPlayer
                 {
                     Name = who.Name ?? "",
+                    Puuid = who.Puuid ?? "",
                     ChampionId = Int(p, "championId"),
                     TeamId = Int(p, "teamId"),
                     Kills = Int(st, "kills"),
