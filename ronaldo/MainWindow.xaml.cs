@@ -44,7 +44,14 @@ public partial class MainWindow
     private bool _gameWasRunning;
     private bool _inGame;
     private string? _viewingPuuid;
+    private string? _viewingName;
     private long _shownGameId;
+
+    /// <summary>
+    /// Profiles opened on top of one another, newest last. Drilling from a match scoreboard into
+    /// a player, and from their history into someone else, should walk back the same way.
+    /// </summary>
+    private readonly List<(string? Puuid, string? Name)> _profileHistory = new();
 
     public MainWindow() : this(AppSettings.Load()) { }
 
@@ -275,10 +282,6 @@ public partial class MainWindow
         // The roster doesn't change mid-game, so only build it once.
         if (game.GameId != 0 && game.GameId == _shownGameId) return;
 
-        var localPuuid = await GetLocalPuuidAsync();
-        foreach (var p in game.TeamOne.Concat(game.TeamTwo))
-            p.IsLocalPlayer = localPuuid.Length > 0 && p.Puuid == localPuuid;
-
         // Put the local player's team on top, like the loading screen does.
         if (game.TeamTwo.Any(p => p.IsLocalPlayer))
             (game.TeamOne, game.TeamTwo) = (game.TeamTwo, game.TeamOne);
@@ -293,22 +296,6 @@ public partial class MainWindow
         await _lpTracker.NoteGameStartedAsync(game.GameId);
 
         Dispatcher.Invoke(() => RenderLiveGame(game));
-    }
-
-    private async Task<string> GetLocalPuuidAsync()
-    {
-        string? json = await _lcu.GetAsync("lol-summoner/v1/current-summoner");
-        if (string.IsNullOrEmpty(json)) return "";
-
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.TryGetProperty("puuid", out var p) ? p.GetString() ?? "" : "";
-        }
-        catch
-        {
-            return "";
-        }
     }
 
     private void RenderLiveGame(LiveGame game)
@@ -328,6 +315,15 @@ public partial class MainWindow
 
         if (everyone.Count > 0 && !everyone.Any(p => p.RankText.Length > 0))
             notes.Add("The client only reports ranked stats for some players, so ranks may be blank.");
+
+        var others = everyone.Where(p => !p.IsLocalPlayer).ToList();
+
+        if (others.Any(p => p.HasRealWinRate))
+            notes.Add("Other players' win rates are counted from their last 20 games: " +
+                      "Riot only shares split totals for you.");
+
+        if (others.Any(p => p.WinRateText.Length > 0 && !p.HasRealWinRate))
+            notes.Add("Where the client withheld a player's match history, only their ranked wins are shown.");
 
         if (everyone.Any(p => p.ChampionId > 0) && !everyone.Any(p => p.MasteryText.Length > 0))
             notes.Add($"No champion mastery came back; the endpoints tried are listed in {MasteryService.DiagnosticPath}");
@@ -749,13 +745,40 @@ public partial class MainWindow
         if (sender is not FrameworkElement fe || fe.DataContext is not LivePlayerViewModel vm) return;
         if (!vm.CanOpenProfile) return;
 
-        await OpenProfileAsync(vm.Puuid, vm.Name);
+        // Our own row goes through the self path, where the client shares losses, LP and history.
+        await OpenProfileAsync(vm.IsLocalPlayer ? null : vm.Puuid, vm.Name);
+    }
+
+    /// <summary>Opens a player's profile from a finished game's scoreboard.</summary>
+    private async void ScoreboardPlayer_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.DataContext is not ScoreboardRowViewModel vm) return;
+        if (!vm.CanOpenProfile) return;
+
+        // Otherwise the click also reaches the match row and collapses the scoreboard.
+        e.Handled = true;
+
+        string local = await _lcu.GetLocalPuuidAsync();
+        bool isSelf = local.Length > 0 && vm.Puuid == local;
+
+        // Already looking at them: opening the same profile again would just clear the screen.
+        if (vm.Puuid == _viewingPuuid || (isSelf && _viewingPuuid == null)) return;
+
+        await OpenProfileAsync(isSelf ? null : vm.Puuid, vm.Name);
     }
 
     /// <param name="puuid">Whose profile to show, or null for your own.</param>
-    private async Task OpenProfileAsync(string? puuid, string? knownName)
+    /// <param name="recordHistory">
+    /// False when stepping back, so returning does not push the profile being left onto the stack.
+    /// </param>
+    private async Task OpenProfileAsync(string? puuid, string? knownName, bool recordHistory = true)
     {
+        // Remember where we came from, but only when a profile is already on screen.
+        if (recordHistory && ProfilePanel.Visibility == Visibility.Visible)
+            _profileHistory.Add((_viewingPuuid, _viewingName));
+
         _viewingPuuid = puuid;
+        _viewingName = knownName;
 
         ProfilePanel.Visibility = Visibility.Visible;
         ProfileHint.Visibility = Visibility.Visible;
@@ -784,9 +807,28 @@ public partial class MainWindow
 
     private void HomeBtn_Click(object sender, RoutedEventArgs e) => CloseProfile();
 
+    /// <summary>
+    /// Steps back one profile, or leaves for the builds view when this is the first one.
+    /// </summary>
+    private async void ProfileBack_Click(object sender, RoutedEventArgs e)
+    {
+        if (_profileHistory.Count == 0)
+        {
+            CloseProfile();
+            return;
+        }
+
+        var previous = _profileHistory[^1];
+        _profileHistory.RemoveAt(_profileHistory.Count - 1);
+
+        await OpenProfileAsync(previous.Puuid, previous.Name, recordHistory: false);
+    }
+
     private void CloseProfile()
     {
         _viewingPuuid = null;
+        _viewingName = null;
+        _profileHistory.Clear();
         ProfilePanel.Visibility = Visibility.Collapsed;
         TopBar.Visibility = Visibility.Visible;
     }

@@ -52,8 +52,19 @@ public class RankEntryViewModel
             : tier;
 
         LpText = $"{entry.LeaguePoints} LP";
+
+        // Without the losses there is no ratio to show, so say why rather than implying 100%.
+        if (!entry.LossesKnown)
+        {
+            RecordText = entry.Wins == 1 ? "1 win" : $"{entry.Wins} wins";
+
+            // Kept short: the rank card is narrow and a longer line is clipped.
+            WinRateText = "losses hidden";
+            return;
+        }
+
         RecordText = $"{entry.Wins}W {entry.Losses}L";
-        WinRateText = entry.Games > 0
+        WinRateText = entry.HasWinRate
             ? entry.WinRate.ToString("0", CultureInfo.InvariantCulture) + "% win rate"
             : "";
     }
@@ -87,6 +98,7 @@ public class ScoreboardRowViewModel
             : $"{p.Damage} dmg";
         LevelText = $"Lv {p.Level}";
         IsMe = p.IsMe;
+        Puuid = p.Puuid;
 
         Items = p.Items
             .Select(id => new IconItem(
@@ -103,7 +115,15 @@ public class ScoreboardRowViewModel
     public string DamageText { get; }
     public string LevelText { get; }
     public bool IsMe { get; }
+    public string Puuid { get; } = "";
     public List<IconItem> Items { get; }
+
+    /// <summary>
+    /// Bots and players the client anonymises come back with a blank or all-zero puuid,
+    /// and there is no profile to open for them.
+    /// </summary>
+    public bool CanOpenProfile =>
+        Puuid.Length > 0 && Puuid.Any(c => c != '0' && c != '-');
 }
 
 /// <summary>A match in the history list, expandable into its full scoreboard.</summary>
@@ -251,6 +271,7 @@ public class MatchViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(BlueTeam));
             OnPropertyChanged(nameof(RedTeam));
             OnPropertyChanged(nameof(ScoreboardMissing));
+            OnPropertyChanged(nameof(HasScoreboard));
         }
 
         IsExpanded = true;

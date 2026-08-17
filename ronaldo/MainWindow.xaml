@@ -78,7 +78,8 @@
 
         <!-- One row of an expanded match scoreboard -->
         <DataTemplate x:Key="ScoreboardRowTemplate">
-            <Border CornerRadius="6" Padding="8,5" Margin="0,0,0,4" BorderThickness="1">
+            <Border CornerRadius="6" Padding="8,5" Margin="0,0,0,4" BorderThickness="1"
+                    MouseLeftButtonUp="ScoreboardPlayer_Click">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Background" Value="#1E1929"/>
@@ -88,6 +89,18 @@
                                 <Setter Property="Background" Value="{StaticResource BgCardOn}"/>
                                 <Setter Property="BorderBrush" Value="{StaticResource EdgeOn}"/>
                             </DataTrigger>
+                            <!-- Only rows the client named can be opened, so only they invite a click. -->
+                            <DataTrigger Binding="{Binding CanOpenProfile}" Value="True">
+                                <Setter Property="Cursor" Value="Hand"/>
+                            </DataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding CanOpenProfile}" Value="True"/>
+                                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}"
+                                               Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="BorderBrush" Value="{StaticResource Violet}"/>
+                            </MultiDataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
@@ -255,6 +268,12 @@
                                               ItemTemplate="{StaticResource ScoreboardRowTemplate}"/>
                             </StackPanel>
                         </Grid>
+
+                        <ui:TextBlock Text="Click a player to open their profile"
+                                      Style="{StaticResource Caption}"
+                                      Foreground="{StaticResource Violet}"
+                                      Margin="0,8,0,0"
+                                      Visibility="{Binding HasScoreboard, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -658,17 +677,27 @@
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" CornerRadius="21" Width="42" Height="42"
+                        <!-- Steps back through the profiles opened from match scoreboards,
+                             and out to the builds view once there is nothing left to go back to. -->
+                        <Button x:Name="ProfileBackBtn" Grid.Column="0" Click="ProfileBack_Click"
+                                Width="32" Height="32" Margin="0,0,12,0" Padding="0"
+                                Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                VerticalAlignment="Center" ToolTip="Back">
+                            <ui:SymbolIcon Symbol="ArrowLeft24" FontSize="18"
+                                           Foreground="{StaticResource VioletLt}"/>
+                        </Button>
+
+                        <Border Grid.Column="1" CornerRadius="21" Width="42" Height="42"
                                 ClipToBounds="True" Background="#191324">
                             <Image x:Name="ProfileIcon" Width="42" Height="42"
                                    RenderOptions.BitmapScalingMode="HighQuality"/>
                         </Border>
 
-                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"
+                        <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center"
                                     Orientation="Horizontal">
                             <ui:TextBlock x:Name="ProfileName" Text="—" FontTypography="Subtitle"
                                           Foreground="{StaticResource VioletLt}"
@@ -676,9 +705,6 @@
                             <ui:TextBlock x:Name="ProfileLevel" Text="" Style="{StaticResource Caption}"
                                           VerticalAlignment="Center" Margin="12,2,0,0"/>
                         </StackPanel>
-
-                        <ui:TextBlock Grid.Column="2" Text="Home returns to builds"
-                                      Style="{StaticResource Caption}" VerticalAlignment="Center"/>
                     </Grid>
                 </Border>
 
