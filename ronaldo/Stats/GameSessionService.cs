@@ -31,6 +31,12 @@ public class LivePlayer
 
     /// <summary>Mastery on the champion being played, e.g. "M7 · 245K". Blank if unavailable.</summary>
     public string MasteryText { get; set; } = "";
+
+    /// <summary>
+    /// True when the client left this player out of its team list and the card was rebuilt from
+    /// the champion selections. Their champion is known; their name is not.
+    /// </summary>
+    public bool IsHidden { get; set; }
 }
 
 public class LiveGame
@@ -120,23 +126,130 @@ public class GameSessionService
                 queue.TryGetProperty("shortName", out var sn) ? sn.GetString() ?? "" : "";
         }
 
-        // Champion picks sometimes only appear here, keyed by the internal summoner name.
+        // Champion picks sometimes only appear here, keyed by the internal summoner name. The
+        // order is kept as well: it is what lets a hidden player be put back on the right team.
         var picks = new Dictionary<string, (int Champ, int S1, int S2)>(StringComparer.OrdinalIgnoreCase);
+        var selections = new List<Selection>();
+
         if (data.TryGetProperty("playerChampionSelections", out var sel) &&
             sel.ValueKind == JsonValueKind.Array)
         {
             foreach (var p in sel.EnumerateArray())
             {
                 string key = Str(p, "summonerInternalName", "summonerName", "puuid");
-                if (key.Length == 0) continue;
-                picks[key] = (Int(p, "championId"), Int(p, "spell1Id"), Int(p, "spell2Id"));
+                var pick = (Champ: Int(p, "championId"), S1: Int(p, "spell1Id"), S2: Int(p, "spell2Id"));
+
+                if (key.Length > 0) picks[key] = pick;
+
+                selections.Add(new Selection(Str(p, "puuid"), pick.Champ, pick.S1, pick.S2));
             }
         }
 
         game.TeamOne = ReadTeam(data, "teamOne", picks);
         game.TeamTwo = ReadTeam(data, "teamTwo", picks);
 
+        RestoreHiddenPlayers(game, selections);
+
         return game;
+    }
+
+    /// <summary>One entry of playerChampionSelections, in the order the client listed it.</summary>
+    private readonly record struct Selection(string Puuid, int Champ, int S1, int S2);
+
+    /// <summary>
+    /// Puts back players the client left out of its team lists.
+    ///
+    /// Streamer mode and privacy settings drop a player from gameData.teamOne/teamTwo entirely,
+    /// so the team renders with four cards instead of five. playerChampionSelections still
+    /// carries all ten, in team order — first half one side, second half the other — so the card
+    /// can be rebuilt with its champion, spells and puuid. There is no name to show, but a
+    /// champion with no stats beats a missing player.
+    /// </summary>
+    private static void RestoreHiddenPlayers(LiveGame game, List<Selection> selections)
+    {
+        if (selections.Count == 0 || selections.Count % 2 != 0) return;
+
+        var known = game.TeamOne.Concat(game.TeamTwo)
+            .Select(p => p.Puuid)
+            .Where(p => p.Length > 0)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        int perTeam = selections.Count / 2;
+
+        for (int i = 0; i < selections.Count; i++)
+        {
+            var s = selections[i];
+            if (s.Puuid.Length == 0 || known.Contains(s.Puuid)) continue;
+
+            // The half a selection falls in says which side it belongs to. If that side is
+            // somehow already full, use the other rather than pushing a team to six.
+            var expected = i < perTeam ? game.TeamOne : game.TeamTwo;
+            var other = i < perTeam ? game.TeamTwo : game.TeamOne;
+            var team = expected.Count < perTeam ? expected
+                     : other.Count < perTeam ? other
+                     : null;
+
+            if (team == null) continue;
+
+            team.Add(new LivePlayer
+            {
+                Puuid = s.Puuid,
+                ChampionId = s.Champ,
+                Spell1Id = s.S1,
+                Spell2Id = s.S2,
+                IsHidden = true
+            });
+
+            known.Add(s.Puuid);
+        }
+
+        foreach (var team in new[] { game.TeamOne, game.TeamTwo })
+        {
+            InferMissingPosition(team, perTeam);
+            SortByLane(team);
+        }
+    }
+
+    /// <summary>
+    /// Gives a restored player the one lane its team has not accounted for. Without this the
+    /// rebuilt card has no position and would sort to the end instead of into its slot.
+    /// </summary>
+    private static void InferMissingPosition(List<LivePlayer> team, int perTeam)
+    {
+        // Only safe on a full five-lane team where exactly one position is unaccounted for.
+        if (team.Count != perTeam || perTeam != 5) return;
+
+        var blank = team.Where(p => p.Position.Length == 0).ToList();
+        if (blank.Count != 1) return;
+
+        var taken = team
+            .Select(p => StatsCatalog.LaneFromLcuPosition(p.Position))
+            .Where(l => l.HasValue)
+            .Select(l => l!.Value)
+            .ToHashSet();
+
+        if (taken.Count != perTeam - 1) return;
+
+        var missing = Enum.GetValues<Lane>().Where(l => !taken.Contains(l)).ToList();
+        if (missing.Count != 1) return;
+
+        blank[0].Position = StatsCatalog.LcuPosition(missing[0]);
+    }
+
+    /// <summary>
+    /// The client lists a team in no particular order, while the loading screen shows it by lane.
+    /// Lane is declared top/jungle/mid/bottom/support, so its values sort directly. Anything with
+    /// no position — ARAM, customs — sorts last and keeps the order it arrived in, OrderBy being
+    /// stable.
+    /// </summary>
+    private static void SortByLane(List<LivePlayer> team)
+    {
+        var ordered = team
+            .OrderBy(p => (int?)StatsCatalog.LaneFromLcuPosition(p.Position) ?? 5)
+            .ToList();
+
+        team.Clear();
+        team.AddRange(ordered);
     }
 
     private static List<LivePlayer> ReadTeam(
@@ -174,13 +287,8 @@ public class GameSessionService
             team.Add(player);
         }
 
-        // The client lists a team in no particular order, while the loading screen shows it by
-        // lane. Lane is declared top/jungle/mid/bottom/support, so its values sort directly.
-        // Anything the client gives no position for — ARAM, customs — sorts last, and keeps the
-        // order it arrived in, since OrderBy is stable.
-        return team
-            .OrderBy(p => (int?)StatsCatalog.LaneFromLcuPosition(p.Position) ?? 5)
-            .ToList();
+        SortByLane(team);
+        return team;
     }
 
     /// <summary>Fills in any blank names by looking the player up by puuid.</summary>

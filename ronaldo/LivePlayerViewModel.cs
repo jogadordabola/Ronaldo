@@ -10,8 +10,13 @@ public class LivePlayerViewModel
 {
     public LivePlayerViewModel(LcuService lcu, LivePlayer player)
     {
-        Name = string.IsNullOrWhiteSpace(player.Name) ? "Unknown" : player.Name;
+        // A hidden player has no name to show, so say why rather than leaving it blank.
+        Name = !string.IsNullOrWhiteSpace(player.Name) ? player.Name
+             : player.IsHidden ? "Hidden player"
+             : "Unknown";
+
         IsLocalPlayer = player.IsLocalPlayer;
+        IsHidden = player.IsHidden;
 
         ChampionName = lcu.ChampionData.TryGetValue(player.ChampionId, out var c)
             ? c.Name
@@ -54,6 +59,7 @@ public class LivePlayerViewModel
     public string MasteryText { get; }
     public string PositionText { get; }
     public bool IsLocalPlayer { get; }
+    public bool IsHidden { get; }
     public string Puuid { get; } = "";
 
     /// <summary>Only players the client identified can have a profile opened.</summary>

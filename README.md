@@ -21,8 +21,10 @@ winning with — then applies them with one click.
   assigned position and the role would otherwise be guessed from play rate
 
 **In game**
-- Loading-screen style scoreboard: both teams, five and five, with champion, summoner spells,
-  ranked stats and champion mastery
+- Loading-screen style scoreboard: both teams, five and five, in lane order, with champion,
+  summoner spells, ranked stats and champion mastery
+- Players the client hides — streamer mode, privacy settings — are put back from the champion
+  selections rather than leaving a gap, so a team is never short a card
 - Win rate for every player, counted from their last 20 games. Riot only publishes loss counts
   for your own account, so for everyone else the record is tallied from their match history
   rather than read off their profile
@@ -69,6 +71,10 @@ Settings live in `%LOCALAPPDATA%\ronaldo\`, alongside a small icon cache.
 
 - **LP per game** is derived from snapshots taken around your games, because the client keeps
   no historical LP. It therefore only appears for games played while the app was running.
+- **A hidden player's lane is deduced, not reported.** The client omits them from its team list
+  altogether, so the card is rebuilt from the champion selections and given whichever of the
+  five lanes the rest of the team does not account for. Their name and rank usually still
+  resolve, since the selections carry the puuid.
 - **Other players' losses are withheld by Riot.** The client returns their ranked wins but
   reports `losses: 0` for anyone but you, which is why win rates for other players are counted
   from their match history instead. Treating that zero as real would put every opponent on a
