@@ -62,6 +62,29 @@ public enum LaneSource
 }
 
 /// <summary>Everything the UI shows for one champion at one lane/rank/region.</summary>
+/// <summary>One item option for a particular purchase slot.</summary>
+public class SlotItem
+{
+    public int ItemId { get; set; }
+    public int Play { get; set; }
+    public int Win { get; set; }
+    public double PickRate { get; set; }
+
+    public double WinRatePercent => Play > 0 ? Win * 100.0 / Play : 0;
+}
+
+/// <summary>
+/// The popular choices for one purchase slot — what tends to be bought fourth, fifth or sixth —
+/// most picked first, as op.gg orders them.
+/// </summary>
+public class ItemSlot
+{
+    /// <summary>Which purchase this is: 1 for the first item through 6 for the last.</summary>
+    public int Slot { get; set; }
+
+    public List<SlotItem> Items { get; set; } = new();
+}
+
 /// <summary>
 /// How the champion fares against one opponent in the same lane, over the rank and region
 /// currently selected. Win and play are this champion's, not the opponent's.
@@ -95,6 +118,9 @@ public class ChampionBuildData
 
     /// <summary>Lane matchups, best win rate first. Empty when the source had none.</summary>
     public List<ChampionMatchup> Matchups { get; set; } = new();
+
+    /// <summary>Popular items per purchase slot, keyed by slot number. Shown, never imported.</summary>
+    public List<ItemSlot> ItemSlots { get; set; } = new();
 
     /// <summary>Set when every online source failed and we fell back to the in-client data.</summary>
     public bool IsFallback { get; set; }

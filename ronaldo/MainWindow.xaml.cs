@@ -338,6 +338,7 @@ public partial class MainWindow
 
         PagesList.ItemsSource = null;
         MatchupPanel.Visibility = Visibility.Collapsed;
+        ItemSlotPanel.Visibility = Visibility.Collapsed;
         _pageViewModels = new List<RunePageViewModel>();
         _selected = null;
 
@@ -481,7 +482,10 @@ public partial class MainWindow
         await IconCache.PreloadAsync(
             data.Pages.SelectMany(p => RunePageViewModel.IconPathsFor(_lcu, p))
                 .Concat(ShownMatchups(data)
-                    .Select(m => LivePlayerViewModel.ChampionIconPath(m.OpponentId))));
+                    .Select(m => LivePlayerViewModel.ChampionIconPath(m.OpponentId)))
+                .Concat(LaterSlots(data)
+                    .SelectMany(s => s.Items.Take(OptionsPerSlot))
+                    .Select(i => _lcu.ItemIcons.TryGetValue(i.ItemId, out var p) ? p : null)));
 
         if (championId != _lastChampionId) return;
 
@@ -545,6 +549,7 @@ public partial class MainWindow
         PagesList.ItemsSource = _pageViewModels;
         _selected = _pageViewModels.FirstOrDefault();
 
+        RenderItemSlots(data);
         RenderMatchups(data);
 
         bool hasPages = _pageViewModels.Count > 0;
@@ -570,6 +575,46 @@ public partial class MainWindow
 
     /// <summary>How many opponents each of the two matchup lists shows.</summary>
     private const int MatchupsPerSide = 5;
+
+    /// <summary>Purchase slots shown, and how many options each. op.gg shows the same five.</summary>
+    private static readonly int[] LaterItemSlots = { 4, 5, 6 };
+    private const int OptionsPerSlot = 5;
+
+    /// <summary>The slots worth showing: the ones past the core build, in order.</summary>
+    private static List<ItemSlot> LaterSlots(ChampionBuildData data) =>
+        LaterItemSlots
+            .Select(n => data.ItemSlots.FirstOrDefault(s => s.Slot == n))
+            .Where(s => s is { Items.Count: > 0 })
+            .Select(s => s!)
+            .ToList();
+
+    /// <summary>
+    /// Fills the fourth/fifth/sixth item columns. These are shown for reference only — the item
+    /// set import stays on the core build, so nothing here reaches the client.
+    /// </summary>
+    private void RenderItemSlots(ChampionBuildData data)
+    {
+        var slots = LaterSlots(data);
+
+        if (slots.Count == 0)
+        {
+            ItemSlotPanel.Visibility = Visibility.Collapsed;
+            ItemSlotList.ItemsSource = null;
+            return;
+        }
+
+        ItemSlotList.ItemsSource = slots
+            .Select(s => new ItemSlotViewModel(_lcu, s, OptionsPerSlot))
+            .ToList();
+
+        // Say when a slot is missing, or its absence looks like a bug rather than a champion
+        // that seldom gets that far.
+        ItemSlotNote.Text = slots.Count == LaterItemSlots.Length
+            ? "most picked first · not imported"
+            : "most picked first · not imported · slots this champion rarely reaches are hidden";
+
+        ItemSlotPanel.Visibility = Visibility.Visible;
+    }
 
     /// <summary>
     /// Splits the matchups into the two lists shown. They arrive ordered by win rate, so the
@@ -629,6 +674,8 @@ public partial class MainWindow
         StrongList.ItemsSource = null;
         WeakList.ItemsSource = null;
         MatchupPanel.Visibility = Visibility.Collapsed;
+        ItemSlotList.ItemsSource = null;
+        ItemSlotPanel.Visibility = Visibility.Collapsed;
         ChampNameText.Text = "None (hover a champion)";
         RoleBadge.Text = "—";
         PatchBadge.Text = "";

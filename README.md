@@ -13,6 +13,8 @@ winning with — then applies them with one click.
 - Three distinct rune pages per champion, ranked by pick rate, each with win rate and sample size
 - Item build per page, filtered to the games that ran *that keystone*
 - Starting items, boots, summoner spells and situational items, all as icons
+- What tends to be bought fourth, fifth and sixth, most picked first, with a win rate and
+  sample for each. Shown for reference only — the item set import stays on the core build
 - Click any page to apply it to the client; the top page can auto-apply
 - Lane matchups: the five opponents this champion beats most and the five it loses to most,
   by win rate, with the sample behind each. Follows the same role, rank and region filters
@@ -91,6 +93,10 @@ Settings live in `%LOCALAPPDATA%\ronaldo\`, alongside a small icon cache.
   alone, and logs the endpoints it tried to `%LOCALAPPDATA%\ronaldo\match-history-probe.txt`.
 - The client only serves **recent** matches, so "most played" is a form guide over that
   window rather than a career total.
+- **A late item slot can be missing.** Options need 50 games, and a slot with none left is
+  hidden: a support that seldom reaches a sixth item would otherwise report a single game as a
+  100% win rate, the most convincing-looking number on the panel. The panel says when a slot
+  has been hidden for that reason.
 - **Rare lane matchups are dropped**, since a matchup seen forty times can read 60% on noise
   alone and would top the table ahead of a real counter. A matchup needs 50 games and a tenth
   of the games of the most common one. The sample is shown next to every win rate so the

@@ -127,6 +127,97 @@ public class OpGgClient
     }
 
     /// <summary>
+    /// Reads the popular choice for each purchase slot: what tends to be bought first through
+    /// sixth, with the win rate and sample for each option.
+    ///
+    /// This lives on a separate endpoint. The champion payload's last_items is one flat pool
+    /// across the whole game, so it cannot say which item goes in which slot; single_items
+    /// groups the options by depth, which is what op.gg's own fourth/fifth/sixth columns show.
+    /// </summary>
+    public async Task<List<ItemSlot>> GetItemSlotsAsync(
+        int championId, Lane lane, StatsRank rank, StatsRegion region, CancellationToken ct = default)
+    {
+        string url = $"{BaseUrl}/{StatsCatalog.OpGgRegion(region)}/champions/ranked/" +
+                     $"{championId}/{StatsCatalog.OpGgPosition(lane)}/builds" +
+                     $"?tier={StatsCatalog.OpGgTier(rank)}";
+
+        var slots = new List<ItemSlot>();
+
+        string? json = await StatsHttp.GetStringAsync(url, ct);
+        if (string.IsNullOrEmpty(json)) return slots;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("data", out var data)) return slots;
+            if (!data.TryGetProperty("single_items", out var groups) ||
+                groups.ValueKind != JsonValueKind.Array) return slots;
+
+            foreach (var g in groups.EnumerateArray())
+            {
+                var slot = new ItemSlot { Slot = GetInt(g, "depth") };
+
+                if (slot.Slot <= 0) continue;
+                if (!g.TryGetProperty("items", out var items) ||
+                    items.ValueKind != JsonValueKind.Array) continue;
+
+                foreach (var item in items.EnumerateArray())
+                {
+                    int id = SingleItemId(item);
+                    int play = GetInt(item, "play");
+                    if (id <= 0 || play <= 0) continue;
+
+                    slot.Items.Add(new SlotItem
+                    {
+                        ItemId = id,
+                        Play = play,
+                        Win = GetInt(item, "win"),
+                        PickRate = GetDouble(item, "pick_rate")
+                    });
+                }
+
+                if (slot.Items.Count > 0) slots.Add(slot);
+            }
+        }
+        catch
+        {
+            return new List<ItemSlot>();
+        }
+
+        return slots;
+    }
+
+    /// <summary>
+    /// Pulls the item id out of a single_items entry. Here "ids" is a bare string holding one id,
+    /// where every other item list on op.gg makes it an array — so it is read both ways.
+    /// </summary>
+    private static int SingleItemId(JsonElement e)
+    {
+        if (!e.TryGetProperty("ids", out var ids)) return 0;
+
+        switch (ids.ValueKind)
+        {
+            case JsonValueKind.String:
+                return int.TryParse(ids.GetString(), out int parsed) ? parsed : 0;
+
+            case JsonValueKind.Number:
+                return ids.TryGetInt32(out int number) ? number : 0;
+
+            case JsonValueKind.Array:
+                foreach (var x in ids.EnumerateArray())
+                {
+                    if (x.ValueKind == JsonValueKind.Number && x.TryGetInt32(out int n)) return n;
+                    if (x.ValueKind == JsonValueKind.String &&
+                        int.TryParse(x.GetString(), out int s)) return s;
+                }
+                return 0;
+
+            default:
+                return 0;
+        }
+    }
+
+    /// <summary>
     /// Reads the lane matchups. op.gg returns one entry per opponent for the position asked
     /// about, with this champion's games and wins against them.
     /// </summary>

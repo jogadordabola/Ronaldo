@@ -31,6 +31,48 @@ public class ChampionStatViewModel
     public bool IsStrong { get; }
 }
 
+/// <summary>One item option in a purchase-slot column.</summary>
+public class SlotItemViewModel
+{
+    public SlotItemViewModel(LcuService lcu, SlotItem item)
+    {
+        Icon = IconCache.Get(lcu.ItemIcons.TryGetValue(item.ItemId, out var path) ? path : null);
+        Name = lcu.ItemNames.TryGetValue(item.ItemId, out var n) ? n : $"#{item.ItemId}";
+
+        WinRateText = item.WinRatePercent.ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        GamesText = $"{item.Play:N0} games";
+        IsStrong = item.WinRatePercent >= 50;
+    }
+
+    public ImageSource? Icon { get; }
+    public string Name { get; }
+    public string WinRateText { get; }
+    public string GamesText { get; }
+    public bool IsStrong { get; }
+}
+
+/// <summary>One column of the fourth/fifth/sixth item table.</summary>
+public class ItemSlotViewModel
+{
+    public ItemSlotViewModel(LcuService lcu, ItemSlot slot, int take)
+    {
+        Title = slot.Slot switch
+        {
+            4 => "FOURTH ITEM",
+            5 => "FIFTH ITEM",
+            6 => "SIXTH ITEM",
+            _ => $"ITEM {slot.Slot}"
+        };
+
+        // Already ordered most-picked-first by op.gg, which is the order worth keeping: the
+        // top of each column is what people actually build, not the highest win rate.
+        Items = slot.Items.Take(take).Select(i => new SlotItemViewModel(lcu, i)).ToList();
+    }
+
+    public string Title { get; }
+    public List<SlotItemViewModel> Items { get; }
+}
+
 /// <summary>One lane matchup in the strong/weak lists.</summary>
 public class MatchupViewModel
 {

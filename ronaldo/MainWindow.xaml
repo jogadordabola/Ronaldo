@@ -76,6 +76,57 @@
             <WrapPanel Orientation="Horizontal"/>
         </ItemsPanelTemplate>
 
+        <!-- One item option inside a fourth/fifth/sixth item column -->
+        <DataTemplate x:Key="SlotItemTemplate">
+            <Border Background="#1E1929" CornerRadius="6" Padding="8,5" Margin="0,0,8,4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" CornerRadius="4" Width="28" Height="28"
+                            ClipToBounds="True" Background="#191324">
+                        <Image Source="{Binding Icon}" Width="28" Height="28"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                    </Border>
+
+                    <ui:TextBlock Grid.Column="1" Text="{Binding Name}" FontTypography="Caption"
+                                  Foreground="{StaticResource TextHi}" Margin="8,0,6,0"
+                                  VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <ui:TextBlock Text="{Binding WinRateText}" FontTypography="Caption"
+                                      HorizontalAlignment="Right">
+                            <ui:TextBlock.Style>
+                                <Style TargetType="ui:TextBlock">
+                                    <Setter Property="Foreground" Value="#F0A0A8"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsStrong}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource Mint}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:TextBlock.Style>
+                        </ui:TextBlock>
+                        <ui:TextBlock Text="{Binding GamesText}" Style="{StaticResource Caption}"
+                                      HorizontalAlignment="Right"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- One column of the fourth/fifth/sixth item table -->
+        <DataTemplate x:Key="ItemSlotTemplate">
+            <StackPanel>
+                <ui:TextBlock Text="{Binding Title}" Style="{StaticResource Caption}"
+                              Foreground="{StaticResource Lilac}" Margin="0,0,0,6"/>
+                <ItemsControl ItemsSource="{Binding Items}"
+                              ItemTemplate="{StaticResource SlotItemTemplate}"/>
+            </StackPanel>
+        </DataTemplate>
+
         <!-- One opponent in the lane-matchup lists -->
         <DataTemplate x:Key="MatchupTemplate">
             <Border Background="#1E1929" CornerRadius="6" Padding="8,5" Margin="0,0,0,4">
@@ -701,6 +752,36 @@
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
+
+                    <!-- What tends to be bought fourth, fifth and sixth. Reference only:
+                         the item set import stays on the core build above. -->
+                    <Border x:Name="ItemSlotPanel" Visibility="Collapsed"
+                            Background="{StaticResource BgPanel}" CornerRadius="10"
+                            BorderBrush="{StaticResource Edge}" BorderThickness="1"
+                            Margin="6,4,6,10" Padding="14,12">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBlock Grid.Column="0" Text="LATER ITEMS"
+                                              Style="{StaticResource Caption}"
+                                              Foreground="{StaticResource VioletLt}"/>
+                                <ui:TextBlock Grid.Column="1" x:Name="ItemSlotNote" Text=""
+                                              Style="{StaticResource Caption}"/>
+                            </Grid>
+
+                            <ItemsControl x:Name="ItemSlotList"
+                                          ItemTemplate="{StaticResource ItemSlotTemplate}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="3"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Lane matchups, from the same op.gg request as the builds -->
                     <Border x:Name="MatchupPanel" Visibility="Collapsed"

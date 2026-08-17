@@ -34,6 +34,9 @@ public class BuildProvider
     /// </summary>
     private const int MatchupShareOfBusiest = 10;
 
+    /// <summary>Floor on the games behind a single slot option, for the same reason.</summary>
+    private const int MinSlotItemGames = 50;
+
     /// <param name="assignedLane">
     /// The lane to build for, or null to let op.gg's play rates decide. A non-null lane is
     /// always honoured, so a manual override is never second-guessed by the auto-detection.
@@ -70,6 +73,11 @@ public class BuildProvider
         data.LanePlayRates = opgg.LaneRates;
         data.Matchups = RankMatchups(opgg.Counters);
 
+        // One extra request, and only once the lane is settled. Shown for reference only: the
+        // item set import stays on the core build.
+        data.ItemSlots = TrimItemSlots(
+            await _opgg.GetItemSlotsAsync(championId, data.Lane, rank, region, ct));
+
         var pages = BuildPages(lcu, opgg);
         if (pages.Count == 0)
             return await FallbackAsync(lcu, data, ct);
@@ -86,6 +94,23 @@ public class BuildProvider
 
         return data;
     }
+
+    /// <summary>
+    /// Drops slot options with too thin a sample, and any slot left with nothing.
+    ///
+    /// The late slots thin out fast, and a champion that rarely gets that far produces nonsense:
+    /// a support's sixth item can come back as one game at a 100% win rate, which would read as
+    /// the most convincing entry on the panel. Better to show the slot short, or not at all.
+    /// </summary>
+    private static List<ItemSlot> TrimItemSlots(List<ItemSlot> slots) =>
+        slots
+            .Select(s => new ItemSlot
+            {
+                Slot = s.Slot,
+                Items = s.Items.Where(i => i.Play >= MinSlotItemGames).ToList()
+            })
+            .Where(s => s.Items.Count > 0)
+            .ToList();
 
     /// <summary>
     /// Orders the lane matchups by win rate, best first, after dropping the ones too rare to
