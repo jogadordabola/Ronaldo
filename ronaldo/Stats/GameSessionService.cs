@@ -174,7 +174,13 @@ public class GameSessionService
             team.Add(player);
         }
 
-        return team;
+        // The client lists a team in no particular order, while the loading screen shows it by
+        // lane. Lane is declared top/jungle/mid/bottom/support, so its values sort directly.
+        // Anything the client gives no position for — ARAM, customs — sorts last, and keeps the
+        // order it arrived in, since OrderBy is stable.
+        return team
+            .OrderBy(p => (int?)StatsCatalog.LaneFromLcuPosition(p.Position) ?? 5)
+            .ToList();
     }
 
     /// <summary>Fills in any blank names by looking the player up by puuid.</summary>
